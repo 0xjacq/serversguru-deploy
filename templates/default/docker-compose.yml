@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  ${APP_NAME}:
+    image: ${DOCKER_IMAGE}
+    container_name: ${APP_NAME}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT}:${APP_PORT}"
+    environment:
+      - NODE_ENV=production
+      - PORT=${APP_PORT}
+${ENV_VARS}
+    volumes:
+      - app_data:/app/data
+${VOLUMES}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${APP_PORT}${HEALTH_ENDPOINT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  app_data:

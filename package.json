@@ -1,0 +1,59 @@
+{
+  "name": "serversguru-deploy",
+  "version": "1.0.0",
+  "description": "Autonomous VPS deployment using Servers.guru API with SSH provisioning",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "sg-deploy": "bin/sg-deploy"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "servers.guru",
+    "vps",
+    "deployment",
+    "automation",
+    "docker"
+  ],
+  "author": "0xjacq",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xjacq/serversguru-deploy.git"
+  },
+  "bugs": "https://github.com/0xjacq/serversguru-deploy/issues",
+  "homepage": "https://github.com/0xjacq/serversguru-deploy#readme",
+  "files": [
+    "dist/",
+    "bin/",
+    "templates/",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "commander": "^12.1.0",
+    "ssh2": "^1.16.0",
+    "ssh2-sftp-client": "^11.0.0",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/ssh2": "^1.15.1",
+    "@types/ssh2-sftp-client": "^9.0.4",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
