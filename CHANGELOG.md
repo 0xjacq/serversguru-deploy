@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Structured error handling with actionable error codes
 - Pre-flight validation checks before deployment
 - Structured logging with sensitive data redaction
@@ -19,18 +20,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration tests with mock API server
 
 ### Changed
+
 - Improved error messages with suggestions
 - Enhanced CLI with JSON output support
 - Updated package.json with exports field
 
-## [1.0.1] - 2024-XX-XX
+## [1.0.1] - 2025-01-31
 
 ### Fixed
+
 - Minor bug fixes and improvements
 
-## [1.0.0] - 2024-XX-XX
+## [1.0.0] - 2025-01-30
 
 ### Added
+
 - Initial release
 - VPS deployment automation
 - SSH provisioning
