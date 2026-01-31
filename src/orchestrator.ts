@@ -303,8 +303,8 @@ export class DeploymentOrchestrator {
    * Wait for container to report healthy
    */
   private async waitForContainerHealth(): Promise<void> {
-    const maxAttempts = 30;
-    const interval = 2000;
+    const maxAttempts = this.config.options.healthCheckRetries;
+    const interval = this.config.options.healthCheckInterval;
 
     for (let i = 0; i < maxAttempts; i++) {
       const result = await this.ssh.exec(
@@ -337,12 +337,12 @@ export class DeploymentOrchestrator {
 
     const nginxConfig = this.config.domain
       ? renderTemplate(NGINX_CONFIG_TEMPLATE, {
-          DOMAIN: this.config.domain.name,
-          APP_PORT: this.config.app.port.toString(),
-        })
+        DOMAIN: this.config.domain.name,
+        APP_PORT: this.config.app.port.toString(),
+      })
       : renderTemplate(NGINX_IP_CONFIG_TEMPLATE, {
-          APP_PORT: this.config.app.port.toString(),
-        });
+        APP_PORT: this.config.app.port.toString(),
+      });
 
     const configPath = this.config.domain
       ? `/etc/nginx/sites-available/${this.config.app.name}`
@@ -377,7 +377,7 @@ export class DeploymentOrchestrator {
     try {
       await this.ssh.execOrFail(
         `certbot --nginx -d ${this.config.domain.name} ` +
-          `--non-interactive --agree-tos --email ${this.config.domain.email}`
+        `--non-interactive --agree-tos --email ${this.config.domain.email}`
       );
       this.log('SSL certificate obtained');
     } catch (error) {

@@ -1,0 +1,9 @@
+{
+  "name": "basic-nodejs-example",
+  "version": "1.0.0",
+  "description": "Basic Node.js example for serversguru-deploy",
+  "main": "app.js",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

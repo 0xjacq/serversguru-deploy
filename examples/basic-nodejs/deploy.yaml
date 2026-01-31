@@ -1,0 +1,29 @@
+# Basic Node.js deployment configuration
+
+serversGuru:
+  apiKey: "${SERVERSGURU_API_KEY}"
+
+vps:
+  type: "NL1-2"
+  osImage: "ubuntu-22.04"
+  billingCycle: 1
+  hostname: "nodejs-app"
+
+app:
+  name: "nodejs-app"
+  dockerImage: "my-node-app:latest"
+  port: 3000
+  healthEndpoint: "/health"
+  envVars:
+    NODE_ENV: "production"
+    PORT: "3000"
+
+# Optional: Add domain for SSL
+# domain:
+#   name: "app.example.com"
+#   email: "admin@example.com"
+
+options:
+  createSnapshot: true
+  healthCheckRetries: 10
+  healthCheckInterval: 5000

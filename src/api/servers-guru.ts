@@ -92,7 +92,7 @@ export class ServersGuruClient {
       try {
         const errorData = await response.json() as { message?: string; error?: string };
         if (errorData.message || errorData.error) {
-          errorMessage = errorData.message || errorData.error || errorMessage;
+          errorMessage = `${errorData.message || errorData.error} (${response.status})`;
         }
       } catch {
         // Ignore JSON parse errors for error response
