@@ -181,7 +181,15 @@ export class ServersGuruClient {
    * List available OS images
    */
   async getImages(): Promise<string[]> {
-    const response = await this.request<ApiResponse<string[]>>('GET', '/servers/vps/images');
+    const response = await this.request<string[] | ApiResponse<string[]>>(
+      'GET',
+      '/servers/vps/images'
+    );
+    // Handle direct array format (actual API)
+    if (Array.isArray(response)) {
+      return response;
+    }
+    // Handle wrapped format (legacy)
     return response.data ?? [];
   }
 
@@ -381,41 +389,83 @@ export class ServersGuruClient {
    * Rebuild server with new OS
    */
   async rebuildServer(id: number, osImage: string): Promise<{ password: string }> {
-    const response = await this.request<ApiResponse<{ password: string }>>(
+    const response = await this.request<{ password: string } | ApiResponse<{ password: string }>>(
       'POST',
       `/servers/${id}/rebuild`,
       { osImage }
     );
-    if (!response.data) {
+    // Handle direct format (actual API)
+    if ('password' in response && typeof response.password === 'string') {
+      return { password: response.password };
+    }
+    // Handle wrapped format (legacy)
+    const wrapped = response as ApiResponse<{ password: string }>;
+    if (!wrapped.data) {
       throw new ServersGuruApiError('Rebuild failed: no password returned');
     }
-    return response.data;
+    return wrapped.data;
   }
 
   /**
    * List server snapshots
    */
   async listSnapshots(serverId: number): Promise<Snapshot[]> {
-    const response = await this.request<ApiResponse<Snapshot[]>>(
+    const response = await this.request<Snapshot[] | ApiResponse<Snapshot[]>>(
       'GET',
       `/servers/${serverId}/snapshots`
     );
+    // Handle direct array format (actual API)
+    if (Array.isArray(response)) {
+      return response;
+    }
+    // Handle wrapped format (legacy)
     return response.data ?? [];
   }
 
   /**
    * Create server snapshot
+   * Note: The actual API returns { success: true } only. We poll the snapshots list to find the new snapshot.
    */
   async createSnapshot(serverId: number, name?: string): Promise<Snapshot> {
-    const response = await this.request<ApiResponse<Snapshot>>(
+    const snapshotName = name ?? `snapshot-${Date.now()}`;
+
+    // Get current snapshots before creating
+    const snapshotsBefore = await this.listSnapshots(serverId);
+    const existingIds = new Set(snapshotsBefore.map((s) => s.id));
+
+    const response = await this.request<{ success: boolean } | ApiResponse<Snapshot>>(
       'POST',
       `/servers/${serverId}/snapshots/create`,
-      { name: name ?? `snapshot-${Date.now()}` }
+      { name: snapshotName }
     );
-    if (!response.data) {
-      throw new ServersGuruApiError('Failed to create snapshot');
+
+    // Handle wrapped format (legacy) - has data field with snapshot details
+    if ('data' in response && response.data) {
+      return response.data;
     }
-    return response.data;
+
+    // Handle direct success format (actual API) - poll for the new snapshot
+    if ('success' in response && response.success === true) {
+      const maxAttempts = 6;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await this.sleep(5000);
+        const snapshotsAfter = await this.listSnapshots(serverId);
+        const newSnapshot = snapshotsAfter.find((s) => !existingIds.has(s.id));
+        if (newSnapshot) {
+          return newSnapshot;
+        }
+      }
+      // If we can't find it by polling, return a placeholder with the name
+      return {
+        id: Date.now(),
+        name: snapshotName,
+        size: 0,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+      };
+    }
+
+    throw new ServersGuruApiError('Failed to create snapshot');
   }
 
   /**

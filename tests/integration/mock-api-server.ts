@@ -7,7 +7,7 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'http';
 
-import type { VpsProduct, ServerInfo, ServerStatus, Snapshot } from '../../src/config.js';
+import type { VpsProduct, ServerInfo, Snapshot } from '../../src/config.js';
 
 /**
  * Mock API response
@@ -275,7 +275,8 @@ export class MockServersGuruApi {
    */
   private async handleGetBalance(res: ServerResponse): Promise<void> {
     await this.sleep(0);
-    this.sendJson(res, 200, { success: true, data: { balance: this.config.balance } });
+    // Actual API returns { balance: number } directly
+    this.sendJsonDirect(res, 200, { balance: this.config.balance });
   }
 
   /**
@@ -283,7 +284,35 @@ export class MockServersGuruApi {
    */
   private async handleGetProducts(res: ServerResponse): Promise<void> {
     await this.sleep(0);
-    this.sendJson(res, 200, { success: true, data: this.config.products });
+    // Actual API returns object keyed by product ID with raw field names
+    const productsObj: Record<
+      string,
+      {
+        ProductId: number;
+        Cpu: number;
+        Ram: number;
+        Ssd: number;
+        Price: number;
+        Bandwidth: number;
+        Location: number;
+        Arch: string;
+        CpuModel: string;
+      }
+    > = {};
+    this.config.products.forEach((p, idx) => {
+      productsObj[p.id] = {
+        ProductId: idx + 1,
+        Cpu: p.cpu,
+        Ram: p.ram * 1024, // Convert GB to MB for API format
+        Ssd: p.disk,
+        Price: p.price.monthly,
+        Bandwidth: p.bandwidth,
+        Location: 1,
+        Arch: 'x86_64',
+        CpuModel: 'AMD EPYC',
+      };
+    });
+    this.sendJsonDirect(res, 200, productsObj);
   }
 
   /**
@@ -291,7 +320,8 @@ export class MockServersGuruApi {
    */
   private async handleGetImages(res: ServerResponse): Promise<void> {
     await this.sleep(0);
-    this.sendJson(res, 200, { success: true, data: this.config.images });
+    // Actual API returns direct array of image names
+    this.sendJsonDirect(res, 200, this.config.images);
   }
 
   /**
@@ -306,7 +336,21 @@ export class MockServersGuruApi {
       servers = servers.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
     }
 
-    this.sendJson(res, 200, { success: true, data: servers });
+    // Actual API returns { Servers: [...], Page: 0, Total: n } with raw field names
+    const rawServers = servers.map((s) => ({
+      Id: s.id,
+      Ipv4: s.ipv4,
+      Ipv6: '',
+      Name: s.name,
+      VCPU: 2,
+      Ram: 2,
+      DiskSize: 40,
+      CpuModel: 'AMD EPYC',
+      Dc: s.datacenter,
+      Disabled: s.status === 'disabled',
+      Created_at: s.createdAt,
+    }));
+    this.sendJsonDirect(res, 200, { Servers: rawServers, Page: 0, Total: rawServers.length });
   }
 
   /**
@@ -362,6 +406,8 @@ export class MockServersGuruApi {
       }
     }, 1000);
 
+    // Return wrapped format to avoid polling delays in integration tests
+    // (The client supports both formats; unit tests verify the actual API format)
     this.sendJson(res, 201, {
       success: true,
       data: {
@@ -409,11 +455,10 @@ export class MockServersGuruApi {
         }
         break;
       case 'status': {
-        const status: ServerStatus = {
+        // Actual API returns { status: "..." } directly
+        this.sendJsonDirect(res, 200, {
           status: server.status as 'running' | 'stopped' | 'provisioning' | 'error',
-          uptime: server.status === 'running' ? 3600 : undefined,
-        };
-        this.sendJson(res, 200, { success: true, data: status });
+        });
         break;
       }
       case 'power':
@@ -430,10 +475,8 @@ export class MockServersGuruApi {
               server.status = 'running';
             }, 500);
           }
-          this.sendJson(res, 200, {
-            success: true,
-            message: `Power action ${powerBody.powerType} executed`,
-          });
+          // Actual API returns just { success: true }
+          this.sendJson(res, 200, { success: true });
         }
         break;
       case 'snapshots':
@@ -449,10 +492,13 @@ export class MockServersGuruApi {
           const serverSnapshots = this.snapshots.get(serverId) ?? [];
           serverSnapshots.push(snapshot);
           this.snapshots.set(serverId, serverSnapshots);
+          // Return wrapped format to avoid polling delays in integration tests
+          // (The client supports both formats; unit tests verify the actual API format)
           this.sendJson(res, 201, { success: true, data: snapshot });
         } else if (!subAction && method === 'GET') {
           const serverSnapshots = this.snapshots.get(serverId) ?? [];
-          this.sendJson(res, 200, { success: true, data: serverSnapshots });
+          // Actual API returns direct array
+          this.sendJsonDirect(res, 200, serverSnapshots);
         }
         break;
       default:
@@ -480,9 +526,17 @@ export class MockServersGuruApi {
   }
 
   /**
-   * Send JSON response
+   * Send JSON response (wrapped format for legacy endpoints)
    */
   private sendJson(res: ServerResponse, status: number, data: MockResponse): void {
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  }
+
+  /**
+   * Send JSON response (direct format for actual API endpoints)
+   */
+  private sendJsonDirect(res: ServerResponse, status: number, data: unknown): void {
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
   }

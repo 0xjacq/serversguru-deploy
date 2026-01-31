@@ -34,7 +34,7 @@ describe('ServersGuruClient', () => {
     it('should return balance from API', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => Promise.resolve({ success: true, data: { balance: 100.5 } }),
+        json: async () => Promise.resolve({ balance: 100.5 }),
       });
       global.fetch = mockFetch;
 
@@ -68,29 +68,59 @@ describe('ServersGuruClient', () => {
 
   describe('getProducts', () => {
     it('should return list of products', async () => {
-      const mockProducts = [
-        { id: 'NL1-1', name: 'Basic', cpu: 1, ram: 1, disk: 20, price: { monthly: 5 } },
-        { id: 'NL1-2', name: 'Standard', cpu: 2, ram: 2, disk: 40, price: { monthly: 10 } },
-      ];
+      // Actual API returns object keyed by product ID with raw field names
+      const mockProductsRaw = {
+        'NL1-1': {
+          ProductId: 1,
+          Cpu: 1,
+          Ram: 1024,
+          Ssd: 20,
+          Price: 5,
+          Bandwidth: 1000,
+          Location: 1,
+          Arch: 'x86_64',
+          CpuModel: 'AMD EPYC',
+        },
+        'NL1-2': {
+          ProductId: 2,
+          Cpu: 2,
+          Ram: 2048,
+          Ssd: 40,
+          Price: 10,
+          Bandwidth: 2000,
+          Location: 1,
+          Arch: 'x86_64',
+          CpuModel: 'AMD EPYC',
+        },
+      };
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => Promise.resolve({ success: true, data: mockProducts }),
+        json: async () => Promise.resolve(mockProductsRaw),
       });
 
       const products = await client.getProducts();
 
-      expect(products).toEqual(mockProducts);
+      expect(products).toHaveLength(2);
+      expect(products[0]).toMatchObject({
+        id: 'NL1-1',
+        cpu: 1,
+        ram: 1024,
+        disk: 20,
+        bandwidth: 1000,
+        price: { monthly: 5, yearly: 60 },
+      });
     });
   });
 
   describe('getImages', () => {
     it('should return list of OS images', async () => {
+      // Actual API returns direct array of image names
       const mockImages = ['ubuntu-22.04', 'ubuntu-20.04', 'debian-11'];
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => Promise.resolve({ success: true, data: mockImages }),
+        json: async () => Promise.resolve(mockImages),
       });
 
       const images = await client.getImages();
@@ -101,37 +131,67 @@ describe('ServersGuruClient', () => {
 
   describe('orderVps', () => {
     it('should order VPS and return credentials', async () => {
-      const mockOrderResponse = {
-        success: true,
-        data: {
-          serverId: 12345,
-          ipv4: '192.168.1.100',
-          password: 'secretpass123',
-        },
-      };
+      // Actual API: first listServers returns empty, order returns { success: true },
+      // then subsequent listServers calls return the new server
+      const newServerId = 12345;
+      const newServerIp = '192.168.1.100';
 
-      // Mock listServers (called before order) and orderVps response
       global.fetch = vi
         .fn()
+        // First call: listServers (before order) - empty
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => Promise.resolve({ Servers: [] }),
+          json: async () => Promise.resolve({ Servers: [], Page: 0, Total: 0 }),
         })
+        // Second call: orderVps - returns just { success: true }
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => Promise.resolve(mockOrderResponse),
+          json: async () => Promise.resolve({ success: true }),
+        })
+        // Third call: listServers (polling) - new server appears
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () =>
+            Promise.resolve({
+              Servers: [
+                {
+                  Id: newServerId,
+                  Ipv4: newServerIp,
+                  Ipv6: '',
+                  Name: 'test-vps',
+                  VCPU: 2,
+                  Ram: 2,
+                  DiskSize: 40,
+                  CpuModel: 'AMD EPYC',
+                  Dc: 'NL',
+                  Disabled: false,
+                  Created_at: new Date().toISOString(),
+                },
+              ],
+              Page: 0,
+              Total: 1,
+            }),
         });
 
-      const result = await client.orderVps({
-        vpsType: 'NL1-2',
-        osImage: 'ubuntu-22.04',
-        billingCycle: 1,
-      });
+      // Patch sleep to avoid delays in tests
+      const originalSleep = (client as unknown as { sleep: (ms: number) => Promise<void> }).sleep;
+      (client as unknown as { sleep: (ms: number) => Promise<void> }).sleep = async () => {};
 
-      expect(result.success).toBe(true);
-      expect(result.serverId).toBe(12345);
-      expect(result.ipv4).toBe('192.168.1.100');
-      expect(result.password).toBe('secretpass123');
+      try {
+        const result = await client.orderVps({
+          vpsType: 'NL1-2',
+          osImage: 'ubuntu-22.04',
+          billingCycle: 1,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.serverId).toBe(newServerId);
+        expect(result.ipv4).toBe(newServerIp);
+        // Password is not available via API polling
+        expect(result.password).toBe('');
+      } finally {
+        (client as unknown as { sleep: (ms: number) => Promise<void> }).sleep = originalSleep;
+      }
     });
 
     it('should throw on order failure', async () => {
@@ -140,7 +200,7 @@ describe('ServersGuruClient', () => {
         .fn()
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => Promise.resolve({ Servers: [] }),
+          json: async () => Promise.resolve({ Servers: [], Page: 0, Total: 0 }),
         })
         .mockResolvedValueOnce({
           ok: true,
@@ -159,19 +219,15 @@ describe('ServersGuruClient', () => {
 
   describe('getServerStatus', () => {
     it('should return server status', async () => {
+      // Actual API returns { status: "running" } directly
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () =>
-          Promise.resolve({
-            success: true,
-            data: { status: 'running', uptime: 3600 },
-          }),
+        json: async () => Promise.resolve({ status: 'running' }),
       });
 
       const status = await client.getServerStatus(123);
 
       expect(status.status).toBe('running');
-      expect(status.uptime).toBe(3600);
     });
   });
 
@@ -197,23 +253,49 @@ describe('ServersGuruClient', () => {
 
   describe('createSnapshot', () => {
     it('should create snapshot and return info', async () => {
-      const mockSnapshot = {
-        id: 456,
-        name: 'my-snapshot',
-        size: 10,
-        createdAt: '2024-01-15T10:00:00Z',
-        status: 'completed',
-      };
+      // Actual API: createSnapshot returns { success: true }, then poll listSnapshots
+      const snapshotId = 456;
+      const snapshotName = 'my-snapshot';
 
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => Promise.resolve({ success: true, data: mockSnapshot }),
-      });
+      global.fetch = vi
+        .fn()
+        // First call: listSnapshots (before create) - empty
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => Promise.resolve([]),
+        })
+        // Second call: createSnapshot - returns just { success: true }
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => Promise.resolve({ success: true }),
+        })
+        // Third call: listSnapshots (polling) - new snapshot appears
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () =>
+            Promise.resolve([
+              {
+                id: snapshotId,
+                name: snapshotName,
+                size: 10,
+                createdAt: '2024-01-15T10:00:00Z',
+                status: 'active',
+              },
+            ]),
+        });
 
-      const snapshot = await client.createSnapshot(123, 'my-snapshot');
+      // Patch sleep to avoid delays in tests
+      const originalSleep = (client as unknown as { sleep: (ms: number) => Promise<void> }).sleep;
+      (client as unknown as { sleep: (ms: number) => Promise<void> }).sleep = async () => {};
 
-      expect(snapshot.id).toBe(456);
-      expect(snapshot.name).toBe('my-snapshot');
+      try {
+        const snapshot = await client.createSnapshot(123, snapshotName);
+
+        expect(snapshot.id).toBe(snapshotId);
+        expect(snapshot.name).toBe(snapshotName);
+      } finally {
+        (client as unknown as { sleep: (ms: number) => Promise<void> }).sleep = originalSleep;
+      }
     });
   });
 
@@ -223,9 +305,10 @@ describe('ServersGuruClient', () => {
       global.fetch = vi.fn().mockImplementation(async () => {
         callCount++;
         const status = callCount >= 3 ? 'running' : 'provisioning';
+        // Actual API returns { status: "..." } directly
         return Promise.resolve({
           ok: true,
-          json: async () => Promise.resolve({ success: true, data: { status } }),
+          json: async () => Promise.resolve({ status }),
         });
       });
 
@@ -239,9 +322,10 @@ describe('ServersGuruClient', () => {
     });
 
     it('should throw on error status', async () => {
+      // Actual API returns { status: "error" } directly
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => Promise.resolve({ success: true, data: { status: 'error' } }),
+        json: async () => Promise.resolve({ status: 'error' }),
       });
 
       await expect(client.waitForStatus(123, 'running', { timeout: 1000 })).rejects.toThrow(
