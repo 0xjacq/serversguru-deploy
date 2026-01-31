@@ -1,6 +1,6 @@
 {
   "name": "serversguru-deploy",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Autonomous VPS deployment using Servers.guru API with SSH provisioning",
   "type": "module",
   "main": "dist/index.js",
@@ -94,7 +94,7 @@
     "lint-staged": "^15.3.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=18.0.0"

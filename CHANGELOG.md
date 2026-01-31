@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced CLI with JSON output support
 - Updated package.json with exports field
 
+## [1.0.2] - 2025-01-31
+
+### Changed
+
+- Updated CHANGELOG dates for npm publication
+
 ## [1.0.1] - 2025-01-31
 
 ### Fixed
