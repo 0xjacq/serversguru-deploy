@@ -71,8 +71,10 @@ src/
 tests/
 ├── unit/               # Unit tests with mocked dependencies
 │   ├── api-client.test.ts
+│   ├── config.test.ts
+│   ├── orchestrator.test.ts
 │   ├── ssh-provisioner.test.ts
-│   └── orchestrator.test.ts
+│   └── templates.test.ts
 └── integration/        # Integration tests with mock API server
     ├── api-integration.test.ts
     └── mock-api-server.ts
@@ -128,6 +130,16 @@ The library exports from `src/index.ts`:
 - `runPreflightChecks` - Pre-deployment validation
 - Error utilities: `DeploymentError`, `isRetryableError`, `wrapError`
 
+## Sub-path Exports
+
+The package provides additional sub-path exports for selective imports:
+
+```typescript
+import { DeploymentError } from 'serversguru-deploy/errors';
+import { Logger } from 'serversguru-deploy/logger';
+import { runPreflightChecks } from 'serversguru-deploy/preflight';
+```
+
 ## ES Modules
 
-This is an ES module project (`"type": "module"`). Use `.js` extensions in imports even for TypeScript files (e.g., `import { X } from './module.js'`).
+This is an ES module project (`"type": "module"`). Use `.js` extensions in imports even for TypeScript files (e.g., `import { X } from './module.js'`). Requires Node.js >= 18.
