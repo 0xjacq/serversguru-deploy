@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DeploymentOrchestrator } from '../../src/orchestrator.js';
+
 import { ServersGuruClient } from '../../src/api/servers-guru.js';
-import { SshProvisioner } from '../../src/ssh/provisioner.js';
 import type { DeploymentConfig } from '../../src/config.js';
 import { DeploymentError } from '../../src/errors.js';
+import { DeploymentOrchestrator } from '../../src/orchestrator.js';
+import { SshProvisioner } from '../../src/ssh/provisioner.js';
 
 // Mock dependencies
 vi.mock('../../src/api/servers-guru.js', () => ({

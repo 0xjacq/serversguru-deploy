@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SshProvisioner } from '../../src/ssh/provisioner.js';
-import { SshError } from '../../src/errors.js';
+
 import type { SshConfig } from '../../src/config.js';
+import { SshError } from '../../src/errors.js';
+import { SshProvisioner } from '../../src/ssh/provisioner.js';
 
 // Mock ssh2 and ssh2-sftp-client
 const mockConnect = vi.fn();

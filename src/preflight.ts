@@ -5,10 +5,11 @@
  * and provide actionable feedback to users.
  */
 
-import { access, readFile } from 'fs/promises';
 import { constants } from 'fs';
-import type { DeploymentConfig } from './config.js';
+import { access, readFile } from 'fs/promises';
+
 import { ServersGuruClient } from './api/servers-guru.js';
+import type { DeploymentConfig } from './config.js';
 import { DeploymentError, ConfigError, ApiError } from './errors.js';
 import { getLogger } from './logger.js';
 
@@ -436,8 +437,8 @@ const registryAuthCheck: PreflightCheck = {
     }
 
     const missing: string[] = [];
-    if (!auth.username) missing.push('username');
-    if (!auth.password) missing.push('password');
+    if (!auth.username) {missing.push('username');}
+    if (!auth.password) {missing.push('password');}
 
     if (missing.length > 0) {
       return {
@@ -492,7 +493,7 @@ const dnsCheck: PreflightCheck = {
       };
     }
 
-    if (!domain.email || !domain.email.includes('@')) {
+    if (!domain.email?.includes('@')) {
       return {
         passed: false,
         name: 'dns-resolution',

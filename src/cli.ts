@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
 import { readFile, access, constants } from 'fs/promises';
+
+import { Command } from 'commander';
 import { parse as parseYaml } from 'yaml';
+
+import { ServersGuruClient } from './api/servers-guru.js';
 import { DeploymentConfigSchema, type DeploymentConfig, type DeploymentStep } from './config.js';
 import { DeploymentOrchestrator } from './orchestrator.js';
-import { ServersGuruClient } from './api/servers-guru.js';
 
 const program = new Command();
 
@@ -146,7 +148,7 @@ program
         result = await orchestrator.deploy();
       }
 
-      console.log('\n' + '='.repeat(50));
+      console.log(`\n${'='.repeat(50)}`);
       if (result.success) {
         console.log('DEPLOYMENT SUCCESSFUL');
         console.log('='.repeat(50));

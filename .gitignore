@@ -1,9 +1,58 @@
+# Dependencies
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build output
 dist/
+build/
+*.tsbuildinfo
+
+# Coverage
 coverage/
-.DS_Store
+.nyc_output/
+
+# Environment variables
 .env
+.env.local
+.env.*.local
+
+# Logs
+logs/
 *.log
-plans/
-.husky/
-.github/*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cache
+.eslintcache
+.prettiercache
+*.tgz
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Deployment configs (may contain secrets)
+deploy.yaml
+deploy.yml
+.deploy/
+
+# Test artifacts
+test-results/
+playwright-report/
+
+# Misc
+.cache/
+.parcel-cache/

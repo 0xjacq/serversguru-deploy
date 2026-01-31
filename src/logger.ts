@@ -133,8 +133,8 @@ const LEVEL_LABELS: Record<LogLevel, string> = {
  * Structured logger class
  */
 export class Logger {
-  private config: LoggerConfig;
-  private fileStream?: WriteStream;
+  private readonly config: LoggerConfig;
+  private readonly fileStream?: WriteStream;
   private deploymentId?: string;
 
   constructor(config: Partial<LoggerConfig> = {}) {
@@ -288,7 +288,7 @@ export class Logger {
 
     // File output
     if (this.fileStream) {
-      this.fileStream.write(formatted + '\n');
+      this.fileStream.write(`${formatted}\n`);
     }
   }
 

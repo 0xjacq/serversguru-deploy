@@ -1,6 +1,9 @@
+import { readFile } from 'fs/promises';
+import * as net from 'net';
+
 import { Client, type ConnectConfig } from 'ssh2';
 import SftpClient from 'ssh2-sftp-client';
-import { readFile } from 'fs/promises';
+
 import type { ExecResult, SshConfig } from '../config.js';
 
 /**
@@ -26,6 +29,7 @@ export class SshProvisioner {
   private sftpClient: SftpClient | null = null;
   private connected = false;
   private readonly config: SshConfig;
+  private connectConfig: ConnectConfig | null = null;
 
   constructor(config?: Partial<SshConfig>) {
     this.config = {
@@ -61,6 +65,7 @@ export class SshProvisioner {
       connectConfig.privateKey = await readFile(this.config.privateKeyPath);
     }
 
+    this.connectConfig = connectConfig;
     this.client = new Client();
 
     return new Promise((resolve, reject) => {
@@ -139,8 +144,8 @@ export class SshProvisioner {
     if (result.code !== 0) {
       throw new Error(
         `Command failed with code ${result.code}: ${command.substring(0, 100)}\n` +
-          `stderr: ${result.stderr}\n` +
-          `stdout: ${result.stdout}`
+        `stderr: ${result.stderr}\n` +
+        `stdout: ${result.stdout}`
       );
     }
     return result.stdout;
@@ -166,15 +171,12 @@ export class SshProvisioner {
     }
 
     if (!this.sftpClient) {
+      if (!this.connectConfig) {
+        throw new Error('SSH config not available');
+      }
+
       this.sftpClient = new SftpClient();
-      // Get the underlying connection details from our SSH client
-      const connectionInfo = (this.client as unknown as { config: { host: string; port: number; username: string; password?: string } }).config;
-      await this.sftpClient.connect({
-        host: connectionInfo.host,
-        port: connectionInfo.port,
-        username: connectionInfo.username,
-        password: connectionInfo.password,
-      });
+      await this.sftpClient.connect(this.connectConfig);
     }
 
     return this.sftpClient;
@@ -265,6 +267,7 @@ export class SshProvisioner {
     }
 
     this.connected = false;
+    this.connectConfig = null;
   }
 
   /**
@@ -317,7 +320,6 @@ export class SshProvisioner {
    */
   private static async checkPort(host: string, port: number, timeout: number): Promise<boolean> {
     return new Promise((resolve) => {
-      const net = require('net');
       const socket = new net.Socket();
 
       const onError = () => {

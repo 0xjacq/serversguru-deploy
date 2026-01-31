@@ -3,9 +3,11 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+
 import { ServersGuruClient } from '../../src/api/servers-guru.js';
-import { MockServersGuruApi } from './mock-api-server.js';
 import { DeploymentError } from '../../src/errors.js';
+
+import { MockServersGuruApi } from './mock-api-server.js';
 
 describe('ServersGuruClient Integration', () => {
   let mockApi: MockServersGuruApi;

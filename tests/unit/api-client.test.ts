@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { ServersGuruClient, ServersGuruApiError } from '../../src/api/servers-guru.js';
 
 describe('ServersGuruClient', () => {
@@ -33,7 +34,7 @@ describe('ServersGuruClient', () => {
     it('should return balance from API', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ success: true, data: { balance: 100.50 } }),
+        json: async () => Promise.resolve({ success: true, data: { balance: 100.50 } }),
       });
       global.fetch = mockFetch;
 
@@ -56,7 +57,7 @@ describe('ServersGuruClient', () => {
         ok: false,
         status: 401,
         statusText: 'Unauthorized',
-        json: () => Promise.resolve({ message: 'Invalid API key' }),
+        json: async () => Promise.resolve({ message: 'Invalid API key' }),
       });
 
       await expect(client.getBalance()).rejects.toThrow(ServersGuruApiError);
@@ -72,7 +73,7 @@ describe('ServersGuruClient', () => {
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ success: true, data: mockProducts }),
+        json: async () => Promise.resolve({ success: true, data: mockProducts }),
       });
 
       const products = await client.getProducts();
@@ -87,7 +88,7 @@ describe('ServersGuruClient', () => {
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ success: true, data: mockImages }),
+        json: async () => Promise.resolve({ success: true, data: mockImages }),
       });
 
       const images = await client.getImages();
@@ -109,7 +110,7 @@ describe('ServersGuruClient', () => {
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockResponse),
+        json: async () => Promise.resolve(mockResponse),
       });
 
       const result = await client.orderVps({
@@ -127,7 +128,7 @@ describe('ServersGuruClient', () => {
     it('should throw on order failure', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ success: false, message: 'Insufficient balance' }),
+        json: async () => Promise.resolve({ success: false, message: 'Insufficient balance' }),
       });
 
       await expect(
@@ -144,7 +145,7 @@ describe('ServersGuruClient', () => {
     it('should return server status', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () =>
+        json: async () =>
           Promise.resolve({
             success: true,
             data: { status: 'running', uptime: 3600 },
@@ -162,7 +163,7 @@ describe('ServersGuruClient', () => {
     it('should send power action to server', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ success: true }),
+        json: async () => Promise.resolve({ success: true }),
       });
       global.fetch = mockFetch;
 
@@ -190,7 +191,7 @@ describe('ServersGuruClient', () => {
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ success: true, data: mockSnapshot }),
+        json: async () => Promise.resolve({ success: true, data: mockSnapshot }),
       });
 
       const snapshot = await client.createSnapshot(123, 'my-snapshot');
@@ -203,12 +204,12 @@ describe('ServersGuruClient', () => {
   describe('waitForStatus', () => {
     it('should poll until target status reached', async () => {
       let callCount = 0;
-      global.fetch = vi.fn().mockImplementation(() => {
+      global.fetch = vi.fn().mockImplementation(async () => {
         callCount++;
         const status = callCount >= 3 ? 'running' : 'provisioning';
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ success: true, data: { status } }),
+          json: async () => Promise.resolve({ success: true, data: { status } }),
         });
       });
 
@@ -224,7 +225,7 @@ describe('ServersGuruClient', () => {
     it('should throw on error status', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ success: true, data: { status: 'error' } }),
+        json: async () => Promise.resolve({ success: true, data: { status: 'error' } }),
       });
 
       await expect(

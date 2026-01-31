@@ -148,9 +148,9 @@ export class ServersGuruClient {
     let endpoint = '/servers';
     const params = new URLSearchParams();
 
-    if (options?.search) params.set('search', options.search);
-    if (options?.page) params.set('page', options.page.toString());
-    if (options?.perPage) params.set('per_page', options.perPage.toString());
+    if (options?.search) {params.set('search', options.search);}
+    if (options?.page) {params.set('page', options.page.toString());}
+    if (options?.perPage) {params.set('per_page', options.perPage.toString());}
 
     const queryString = params.toString();
     if (queryString) {
@@ -368,7 +368,7 @@ export class ServersGuruClient {
   /**
    * Sleep helper
    */
-  private sleep(ms: number): Promise<void> {
+  private async sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

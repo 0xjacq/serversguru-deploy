@@ -6,6 +6,7 @@
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'http';
+
 import type { VpsProduct, ServerInfo, ServerStatus, Snapshot } from '../../src/config.js';
 
 /**
@@ -41,9 +42,9 @@ interface MockApiServerConfig {
  */
 export class MockServersGuruApi {
   private server: Server | null = null;
-  private config: MockApiServerConfig;
-  private servers: Map<number, ServerInfo> = new Map();
-  private snapshots: Map<number, Snapshot[]> = new Map();
+  private readonly config: MockApiServerConfig;
+  private readonly servers: Map<number, ServerInfo> = new Map();
+  private readonly snapshots: Map<number, Snapshot[]> = new Map();
   private nextServerId = 1000;
   private requestLog: Array<{ method: string; path: string; body?: unknown }> = [];
 
@@ -104,7 +105,7 @@ export class MockServersGuruApi {
    */
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.server = createServer((req, res) => this.handleRequest(req, res));
+      this.server = createServer(async (req, res) => this.handleRequest(req, res));
 
       this.server.on('error', reject);
 
@@ -348,7 +349,7 @@ export class MockServersGuruApi {
       data: {
         serverId: server.id,
         ipv4: server.ipv4,
-        password: 'mock-password-' + server.id,
+        password: `mock-password-${server.id}`,
       },
       message: 'VPS ordered successfully',
     });
@@ -472,7 +473,7 @@ export class MockServersGuruApi {
   /**
    * Sleep helper
    */
-  private sleep(ms: number): Promise<void> {
+  private async sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

@@ -1,4 +1,12 @@
 import { ServersGuruClient, ServersGuruApiError } from './api/servers-guru.js';
+import type {
+  DeploymentConfig,
+  DeploymentResult,
+  ServerInfo,
+  DeploymentStep,
+  ProgressCallback,
+  Snapshot,
+} from './config.js';
 import { SshProvisioner } from './ssh/provisioner.js';
 import {
   SETUP_SCRIPT,
@@ -10,14 +18,6 @@ import {
   generateVolumesSection,
   renderTemplate,
 } from './templates/index.js';
-import type {
-  DeploymentConfig,
-  DeploymentResult,
-  ServerInfo,
-  DeploymentStep,
-  ProgressCallback,
-  Snapshot,
-} from './config.js';
 
 /**
  * Deployment Orchestrator
@@ -36,8 +36,8 @@ export class DeploymentOrchestrator {
   private serverIp?: string;
   private serverPassword?: string;
   private snapshotId?: number;
-  private logs: string[] = [];
-  private errors: string[] = [];
+  private readonly logs: string[] = [];
+  private readonly errors: string[] = [];
 
   constructor(config: DeploymentConfig) {
     this.config = config;
