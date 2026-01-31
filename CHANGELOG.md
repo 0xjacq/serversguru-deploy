@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced CLI with JSON output support
 - Updated package.json with exports field
 
+## [1.0.4] - 2026-01-31
+
+### Fixed
+
+- Fixed balance API response parsing (handle both direct and wrapped formats)
+
 ## [1.0.3] - 2026-01-31
 
 ### Added

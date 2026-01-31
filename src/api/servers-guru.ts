@@ -104,8 +104,15 @@ export class ServersGuruClient {
    * Get account balance
    */
   async getBalance(): Promise<number> {
-    const response = await this.request<ApiResponse<{ balance: number }>>('GET', '/users/balance');
-    return response.data?.balance ?? 0;
+    const response = await this.request<{ balance: number } | ApiResponse<{ balance: number }>>(
+      'GET',
+      '/users/balance'
+    );
+    // Handle both direct response and wrapped response formats
+    if ('balance' in response && typeof response.balance === 'number') {
+      return response.balance;
+    }
+    return (response as ApiResponse<{ balance: number }>).data?.balance ?? 0;
   }
 
   /**
