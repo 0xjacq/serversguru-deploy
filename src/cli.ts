@@ -46,14 +46,48 @@ async function loadConfig(configPath: string): Promise<DeploymentConfig> {
 }
 
 /**
+ * Recursively substitute ${VAR} patterns with environment variables
+ */
+function substituteEnvVars(value: unknown): unknown {
+  if (typeof value === 'string') {
+    // Replace ${VAR} patterns with environment variable values
+    return value.replace(/\$\{([^}]+)\}/g, (match, varName: string) => {
+      const envValue = process.env[varName];
+      if (envValue !== undefined) {
+        return envValue;
+      }
+      // Return original if env var not set (will cause validation error if required)
+      return match;
+    });
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => substituteEnvVars(item));
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      result[key] = substituteEnvVars(val);
+    }
+    return result;
+  }
+
+  return value;
+}
+
+/**
  * Apply environment variable overrides to config
  */
 function applyEnvOverrides(config: Record<string, unknown>): Record<string, unknown> {
-  // Override API key from environment
+  // First, substitute all ${VAR} patterns in the config
+  const substituted = substituteEnvVars(config) as Record<string, unknown>;
+
+  // Then apply specific environment variable overrides (for backwards compatibility)
   const apiKey = process.env.SERVERSGURU_API_KEY;
   if (typeof apiKey === 'string' && apiKey !== '') {
-    const serversGuru = (config.serversGuru as Record<string, unknown>) ?? {};
-    config.serversGuru = {
+    const serversGuru = (substituted.serversGuru as Record<string, unknown>) ?? {};
+    substituted.serversGuru = {
       ...serversGuru,
       apiKey,
     };
@@ -68,8 +102,8 @@ function applyEnvOverrides(config: Record<string, unknown>): Record<string, unkn
     typeof registryPass === 'string' &&
     registryPass !== ''
   ) {
-    const app = (config.app as Record<string, unknown>) ?? {};
-    config.app = {
+    const app = (substituted.app as Record<string, unknown>) ?? {};
+    substituted.app = {
       ...app,
       registryAuth: {
         username: registryUser,
@@ -79,7 +113,7 @@ function applyEnvOverrides(config: Record<string, unknown>): Record<string, unkn
     };
   }
 
-  return config;
+  return substituted;
 }
 
 /**

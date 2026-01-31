@@ -1,6 +1,6 @@
 {
   "name": "serversguru-deploy",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Autonomous VPS deployment using Servers.guru API with SSH provisioning",
   "type": "module",
   "main": "dist/index.js",

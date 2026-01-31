@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced CLI with JSON output support
 - Updated package.json with exports field
 
+## [1.0.3] - 2026-01-31
+
+### Added
+
+- Generic `${VAR}` environment variable substitution in YAML config files
+- All config values now support `${ENV_VAR}` syntax (e.g., `dockerImage: "ghcr.io/${GITHUB_REPOSITORY}:latest"`)
+
+### Changed
+
+- Environment variable substitution now happens before specific overrides
+
 ## [1.0.2] - 2025-01-31
 
 ### Changed
