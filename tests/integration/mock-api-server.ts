@@ -105,7 +105,9 @@ export class MockServersGuruApi {
    */
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.server = createServer(async (req, res) => this.handleRequest(req, res));
+      this.server = createServer((req, res) => {
+        void this.handleRequest(req, res);
+      });
 
       this.server.on('error', reject);
 
@@ -162,7 +164,9 @@ export class MockServersGuruApi {
       id,
       name: serverInfo.name ?? `server-${id}`,
       status: serverInfo.status ?? 'running',
-      ipv4: serverInfo.ipv4 ?? `192.168.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`,
+      ipv4:
+        serverInfo.ipv4 ??
+        `192.168.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`,
       osImage: serverInfo.osImage ?? 'ubuntu-22.04',
       vpsType: serverInfo.vpsType ?? 'NL1-2',
       datacenter: serverInfo.datacenter ?? 'NL',
@@ -192,7 +196,7 @@ export class MockServersGuruApi {
   /**
    * Inject an error for the next request
    */
-  injectError(error: Error): void {
+  injectError(_error: Error): void {
     this.config.errorRate = 1;
   }
 
@@ -210,7 +214,11 @@ export class MockServersGuruApi {
     }
 
     // Simulate random errors
-    if (this.config.errorRate && Math.random() < this.config.errorRate) {
+    if (
+      this.config.errorRate !== undefined &&
+      this.config.errorRate > 0 &&
+      Math.random() < this.config.errorRate
+    ) {
       this.sendError(res, 500, 'Internal server error');
       return;
     }
@@ -266,6 +274,7 @@ export class MockServersGuruApi {
    * Handle GET /users/balance
    */
   private async handleGetBalance(res: ServerResponse): Promise<void> {
+    await this.sleep(0);
     this.sendJson(res, 200, { success: true, data: { balance: this.config.balance } });
   }
 
@@ -273,6 +282,7 @@ export class MockServersGuruApi {
    * Handle GET /servers/vps/products
    */
   private async handleGetProducts(res: ServerResponse): Promise<void> {
+    await this.sleep(0);
     this.sendJson(res, 200, { success: true, data: this.config.products });
   }
 
@@ -280,6 +290,7 @@ export class MockServersGuruApi {
    * Handle GET /servers/vps/images
    */
   private async handleGetImages(res: ServerResponse): Promise<void> {
+    await this.sleep(0);
     this.sendJson(res, 200, { success: true, data: this.config.images });
   }
 
@@ -287,6 +298,7 @@ export class MockServersGuruApi {
    * Handle GET /servers
    */
   private async handleListServers(res: ServerResponse, params: URLSearchParams): Promise<void> {
+    await this.sleep(0);
     let servers = Array.from(this.servers.values());
 
     const search = params.get('search');
@@ -301,7 +313,13 @@ export class MockServersGuruApi {
    * Handle POST /servers/vps/order
    */
   private async handleOrderVps(res: ServerResponse, body: unknown): Promise<void> {
-    const orderBody = body as { vpsType?: string; osImage?: string; billingCycle?: number; hostname?: string };
+    await this.sleep(0);
+    const orderBody = body as {
+      vpsType?: string;
+      osImage?: string;
+      billingCycle?: number;
+      hostname?: string;
+    };
 
     if (!orderBody.vpsType || !orderBody.osImage) {
       this.sendError(res, 400, 'Missing required fields: vpsType, osImage');
@@ -364,6 +382,7 @@ export class MockServersGuruApi {
     res: ServerResponse,
     body: unknown
   ): Promise<void> {
+    await this.sleep(0);
     const match = path.match(/\/servers\/(\d+)(?:\/(\w+)(?:\/(\w+))?)?/);
     if (!match) {
       this.sendError(res, 404, 'Not found');
@@ -389,13 +408,14 @@ export class MockServersGuruApi {
           this.sendJson(res, 200, { success: true, message: 'Server deleted' });
         }
         break;
-      case 'status':
+      case 'status': {
         const status: ServerStatus = {
           status: server.status as 'running' | 'stopped' | 'provisioning' | 'error',
           uptime: server.status === 'running' ? 3600 : undefined,
         };
         this.sendJson(res, 200, { success: true, data: status });
         break;
+      }
       case 'power':
         if (method === 'POST') {
           const powerBody = body as { powerType?: string };
@@ -409,7 +429,10 @@ export class MockServersGuruApi {
               server.status = 'running';
             }, 500);
           }
-          this.sendJson(res, 200, { success: true, message: `Power action ${powerBody.powerType} executed` });
+          this.sendJson(res, 200, {
+            success: true,
+            message: `Power action ${powerBody.powerType} executed`,
+          });
         }
         break;
       case 'snapshots':
@@ -481,7 +504,9 @@ export class MockServersGuruApi {
 /**
  * Create and start a mock API server for tests
  */
-export async function createMockApi(config?: Partial<MockApiServerConfig>): Promise<MockServersGuruApi> {
+export async function createMockApi(
+  config?: Partial<MockApiServerConfig>
+): Promise<MockServersGuruApi> {
   const api = new MockServersGuruApi(config);
   await api.start();
   return api;

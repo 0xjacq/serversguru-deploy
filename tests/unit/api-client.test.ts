@@ -34,20 +34,22 @@ describe('ServersGuruClient', () => {
     it('should return balance from API', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => Promise.resolve({ success: true, data: { balance: 100.50 } }),
+        json: async () => Promise.resolve({ success: true, data: { balance: 100.5 } }),
       });
       global.fetch = mockFetch;
 
       const balance = await client.getBalance();
 
-      expect(balance).toBe(100.50);
+      expect(balance).toBe(100.5);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://my.servers.guru/api/users/balance',
         expect.objectContaining({
           method: 'GET',
-          headers: expect.objectContaining({
+          headers: {
             'X-API-KEY': 'test-api-key',
-          }),
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
         })
       );
     });
@@ -228,9 +230,9 @@ describe('ServersGuruClient', () => {
         json: async () => Promise.resolve({ success: true, data: { status: 'error' } }),
       });
 
-      await expect(
-        client.waitForStatus(123, 'running', { timeout: 1000 })
-      ).rejects.toThrow('entered error state');
+      await expect(client.waitForStatus(123, 'running', { timeout: 1000 })).rejects.toThrow(
+        'entered error state'
+      );
     });
   });
 });

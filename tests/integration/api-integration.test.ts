@@ -2,10 +2,9 @@
  * Integration tests for API client with mock server
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 
 import { ServersGuruClient } from '../../src/api/servers-guru.js';
-import { DeploymentError } from '../../src/errors.js';
 
 import { MockServersGuruApi } from './mock-api-server.js';
 

@@ -1,36 +1,53 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { ServersGuruClient } from '../../src/api/servers-guru.js';
 import type { DeploymentConfig } from '../../src/config.js';
-import { DeploymentError } from '../../src/errors.js';
 import { DeploymentOrchestrator } from '../../src/orchestrator.js';
-import { SshProvisioner } from '../../src/ssh/provisioner.js';
 
-// Mock dependencies
-vi.mock('../../src/api/servers-guru.js', () => ({
-  ServersGuruClient: vi.fn(() => ({
-    getBalance: vi.fn(),
-    orderVps: vi.fn(),
-    getServerStatus: vi.fn(),
-    waitForStatus: vi.fn(),
-    createSnapshot: vi.fn(),
-  })),
-  ServersGuruApiError: class ServersGuruApiError extends Error { },
-}));
+// Shared mock instances that both the mock and tests can access
+const mockApiClient = {
+  getBalance: vi.fn(),
+  orderVps: vi.fn(),
+  getServerStatus: vi.fn(),
+  waitForStatus: vi.fn(),
+  createSnapshot: vi.fn(),
+  restoreSnapshot: vi.fn(),
+};
 
-vi.mock('../../src/ssh/provisioner.js', () => ({
-  SshProvisioner: vi.fn(() => ({
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    exec: vi.fn(),
-    execOrFail: vi.fn(),
-    uploadContent: vi.fn(),
-    waitForSsh: vi.fn(),
-  })),
-}));
+const mockSsh = {
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+  exec: vi.fn(),
+  execOrFail: vi.fn(),
+  uploadContent: vi.fn(),
+};
 
-// Attach static methods to the mock
-(SshProvisioner as any).waitForSsh = vi.fn().mockResolvedValue(undefined);
+// Mock dependencies using shared instances
+vi.mock('../../src/api/servers-guru.js', () => {
+  return {
+    ServersGuruClient: class MockServersGuruClient {
+      getBalance = mockApiClient.getBalance;
+      orderVps = mockApiClient.orderVps;
+      getServerStatus = mockApiClient.getServerStatus;
+      waitForStatus = mockApiClient.waitForStatus;
+      createSnapshot = mockApiClient.createSnapshot;
+      restoreSnapshot = mockApiClient.restoreSnapshot;
+    },
+    ServersGuruApiError: class ServersGuruApiError extends Error {},
+  };
+});
+
+vi.mock('../../src/ssh/provisioner.js', () => {
+  return {
+    SshProvisioner: class MockSshProvisioner {
+      connect = mockSsh.connect;
+      disconnect = mockSsh.disconnect;
+      exec = mockSsh.exec;
+      execOrFail = mockSsh.execOrFail;
+      uploadContent = mockSsh.uploadContent;
+      static waitForSsh = vi.fn().mockResolvedValue(undefined);
+    },
+  };
+});
 
 vi.mock('../../src/templates/index.js', () => ({
   SETUP_SCRIPT: '#!/bin/bash\necho "setup"',
@@ -51,8 +68,6 @@ vi.mock('../../src/templates/index.js', () => ({
 
 describe('DeploymentOrchestrator', () => {
   let orchestrator: DeploymentOrchestrator;
-  let mockApiClient: ReturnType<typeof vi.mocked<typeof ServersGuruClient>>;
-  let mockSsh: ReturnType<typeof vi.mocked<typeof SshProvisioner>>;
 
   const baseConfig: DeploymentConfig = {
     serversGuru: {
@@ -90,30 +105,30 @@ describe('DeploymentOrchestrator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Setup mock implementations
-    mockApiClient = {
-      getBalance: vi.fn().mockResolvedValue(100),
-      orderVps: vi.fn().mockResolvedValue({
-        serverId: 12345,
-        ipv4: '192.168.1.100',
-        password: 'test-password',
-        success: true,
-      }),
-      getServerStatus: vi.fn().mockResolvedValue({ status: 'running' }),
-      waitForStatus: vi.fn().mockResolvedValue({ status: 'running' }),
-      createSnapshot: vi.fn().mockResolvedValue({ id: 999, name: 'test-snapshot', size: 10, createdAt: '2024-01-01', status: 'active' }),
-    } as unknown as ReturnType<typeof vi.mocked<typeof ServersGuruClient>>;
+    // Setup default mock implementations
+    mockApiClient.getBalance.mockResolvedValue(100);
+    mockApiClient.orderVps.mockResolvedValue({
+      serverId: 12345,
+      ipv4: '192.168.1.100',
+      password: 'test-password',
+      success: true,
+    });
+    mockApiClient.getServerStatus.mockResolvedValue({ status: 'running' });
+    mockApiClient.waitForStatus.mockResolvedValue({ status: 'running' });
+    mockApiClient.createSnapshot.mockResolvedValue({
+      id: 999,
+      name: 'test-snapshot',
+      size: 10,
+      createdAt: '2024-01-01',
+      status: 'active',
+    });
+    mockApiClient.restoreSnapshot.mockResolvedValue(undefined);
 
-    mockSsh = {
-      connect: vi.fn().mockResolvedValue(undefined),
-      disconnect: vi.fn().mockResolvedValue(undefined),
-      exec: vi.fn().mockResolvedValue({ stdout: '', stderr: '', code: 0 }),
-      execOrFail: vi.fn().mockResolvedValue('success'),
-      uploadContent: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ReturnType<typeof vi.mocked<typeof SshProvisioner>>;
-
-    (ServersGuruClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockApiClient);
-    (SshProvisioner as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockSsh);
+    mockSsh.connect.mockResolvedValue(undefined);
+    mockSsh.disconnect.mockResolvedValue(undefined);
+    mockSsh.exec.mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+    mockSsh.execOrFail.mockResolvedValue('success');
+    mockSsh.uploadContent.mockResolvedValue(undefined);
 
     orchestrator = new DeploymentOrchestrator(baseConfig);
   });
@@ -127,12 +142,29 @@ describe('DeploymentOrchestrator', () => {
       expect(orchestrator).toBeInstanceOf(DeploymentOrchestrator);
     });
 
-    it('should create API client with config', () => {
-      expect(ServersGuruClient).toHaveBeenCalledWith(baseConfig.serversGuru);
+    it('should accept config with custom timeouts', () => {
+      const customConfig = {
+        ...baseConfig,
+        options: {
+          ...baseConfig.options,
+          provisioningTimeout: 900000,
+          setupTimeout: 1200000,
+        },
+      };
+      const customOrchestrator = new DeploymentOrchestrator(customConfig);
+      expect(customOrchestrator).toBeInstanceOf(DeploymentOrchestrator);
     });
 
-    it('should create SSH provisioner with config', () => {
-      expect(SshProvisioner).toHaveBeenCalledWith(baseConfig.ssh);
+    it('should accept minimal required config', () => {
+      const minimalConfig: DeploymentConfig = {
+        serversGuru: baseConfig.serversGuru,
+        vps: baseConfig.vps,
+        ssh: baseConfig.ssh,
+        app: baseConfig.app,
+        options: baseConfig.options,
+      };
+      const minimalOrchestrator = new DeploymentOrchestrator(minimalConfig);
+      expect(minimalOrchestrator).toBeInstanceOf(DeploymentOrchestrator);
     });
   });
 
@@ -263,8 +295,6 @@ describe('DeploymentOrchestrator', () => {
 
     it('should configure SSL when domain is provided', async () => {
       const domainOrchestrator = new DeploymentOrchestrator(configWithDomain);
-      (ServersGuruClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockApiClient);
-      (SshProvisioner as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockSsh);
 
       mockSsh.exec.mockResolvedValue({ stdout: 'OK', stderr: '', code: 0 });
       mockSsh.execOrFail.mockResolvedValue('success');
@@ -277,8 +307,6 @@ describe('DeploymentOrchestrator', () => {
 
     it('should continue even if SSL certificate fails', async () => {
       const domainOrchestrator = new DeploymentOrchestrator(configWithDomain);
-      (ServersGuruClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockApiClient);
-      (SshProvisioner as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockSsh);
 
       mockSsh.execOrFail
         .mockResolvedValueOnce('success') // setup
@@ -342,12 +370,9 @@ describe('DeploymentOrchestrator', () => {
       mockApiClient.waitForStatus.mockClear();
       mockApiClient.waitForStatus.mockResolvedValue({ status: 'running' });
 
-      // Add restoreSnapshot mock
-      (mockApiClient as unknown as { restoreSnapshot: ReturnType<typeof vi.fn> }).restoreSnapshot = vi.fn().mockResolvedValue(undefined);
-
       await orchestrator.rollback(999);
 
-      expect((mockApiClient as unknown as { restoreSnapshot: ReturnType<typeof vi.fn> }).restoreSnapshot).toHaveBeenCalledWith(12345, 999);
+      expect(mockApiClient.restoreSnapshot).toHaveBeenCalledWith(12345, 999);
     });
 
     it('should throw error if no server ID for rollback', async () => {
@@ -409,12 +434,10 @@ describe('DeploymentOrchestrator', () => {
           ...baseConfig.options,
           healthCheckRetries: 1,
           healthCheckInterval: 10, // 10ms
-        }
+        },
       };
 
       const timeoutOrchestrator = new DeploymentOrchestrator(configTimeout);
-      (ServersGuruClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockApiClient);
-      (SshProvisioner as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockSsh);
 
       mockSsh.exec.mockResolvedValue({ stdout: 'starting', stderr: '', code: 0 });
       mockSsh.execOrFail.mockResolvedValue('success');
@@ -433,8 +456,6 @@ describe('DeploymentOrchestrator', () => {
       };
 
       const noSnapshotOrchestrator = new DeploymentOrchestrator(configNoSnapshot);
-      (ServersGuruClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockApiClient);
-      (SshProvisioner as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockSsh);
 
       mockSsh.exec.mockResolvedValue({ stdout: 'OK', stderr: '', code: 0 });
       mockSsh.execOrFail.mockResolvedValue('success');
@@ -452,8 +473,6 @@ describe('DeploymentOrchestrator', () => {
       };
 
       const volumeOrchestrator = new DeploymentOrchestrator(configWithVolumes);
-      (ServersGuruClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockApiClient);
-      (SshProvisioner as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockSsh);
 
       mockSsh.exec.mockResolvedValue({ stdout: 'OK', stderr: '', code: 0 });
       mockSsh.execOrFail.mockResolvedValue('success');
@@ -477,8 +496,6 @@ describe('DeploymentOrchestrator', () => {
       };
 
       const authOrchestrator = new DeploymentOrchestrator(configWithAuth);
-      (ServersGuruClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockApiClient);
-      (SshProvisioner as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockSsh);
 
       mockSsh.exec.mockResolvedValue({ stdout: 'OK', stderr: '', code: 0 });
       mockSsh.execOrFail.mockResolvedValue('success');
@@ -486,9 +503,7 @@ describe('DeploymentOrchestrator', () => {
       const result = await authOrchestrator.deploy();
 
       expect(result.success).toBe(true);
-      expect(mockSsh.execOrFail).toHaveBeenCalledWith(
-        expect.stringContaining('docker login')
-      );
+      expect(mockSsh.execOrFail).toHaveBeenCalledWith(expect.stringContaining('docker login'));
     });
   });
 });

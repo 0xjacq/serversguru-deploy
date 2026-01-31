@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import type { SshConfig } from '../../src/config.js';
-import { SshError } from '../../src/errors.js';
 import { SshProvisioner } from '../../src/ssh/provisioner.js';
 
 // Mock ssh2 and ssh2-sftp-client
@@ -11,47 +10,70 @@ const mockExec = vi.fn();
 const mockOn = vi.fn();
 const mockOnce = vi.fn();
 
-vi.mock('ssh2', () => ({
-  Client: vi.fn(() => ({
-    connect: mockConnect,
-    end: mockEnd,
-    exec: mockExec,
-    on: mockOn,
-    once: mockOnce,
-    config: {
-      host: 'test-host',
-      port: 22,
-      username: 'root',
-      password: 'test-pass',
+// Shared SFTP mock references
+const mockSftpConnect = vi.fn();
+const mockSftpEnd = vi.fn();
+const mockSftpPut = vi.fn();
+const mockSftpGet = vi.fn();
+const mockSftpStat = vi.fn();
+const mockSftpMkdir = vi.fn();
+
+vi.mock('ssh2', () => {
+  return {
+    Client: class MockClient {
+      connect = mockConnect;
+      end = mockEnd;
+      exec = mockExec;
+      on = mockOn;
+      once = mockOnce;
+      config = {
+        host: 'test-host',
+        port: 22,
+        username: 'root',
+        password: 'test-pass',
+      };
     },
-  })),
-}));
+  };
+});
 
-vi.mock('ssh2-sftp-client', () => ({
-  default: vi.fn(() => ({
-    connect: vi.fn().mockResolvedValue(undefined),
-    end: vi.fn().mockResolvedValue(undefined),
-    put: vi.fn().mockResolvedValue(undefined),
-    get: vi.fn().mockResolvedValue(Buffer.from('test content')),
-    stat: vi.fn().mockResolvedValue({}),
-    mkdir: vi.fn().mockResolvedValue(undefined),
-  })),
-}));
+vi.mock('ssh2-sftp-client', () => {
+  return {
+    default: class MockSftpClient {
+      connect = mockSftpConnect;
+      end = mockSftpEnd;
+      put = mockSftpPut;
+      get = mockSftpGet;
+      stat = mockSftpStat;
+      mkdir = mockSftpMkdir;
+    },
+  };
+});
 
-const mockNetSocket = {
-  connect: vi.fn(),
-  setTimeout: vi.fn(),
-  on: vi.fn(),
-  once: vi.fn(),
-  end: vi.fn(),
-  destroy: vi.fn(),
-  removeAllListeners: vi.fn(),
-};
-
-vi.mock('net', () => ({
-  Socket: vi.fn(() => mockNetSocket),
-  createConnection: vi.fn(() => mockNetSocket),
-}));
+vi.mock('net', () => {
+  return {
+    Socket: class MockSocket {
+      connect = vi.fn();
+      setTimeout = vi.fn();
+      on = vi.fn();
+      once = vi.fn();
+      end = vi.fn();
+      destroy = vi.fn();
+      removeAllListeners = vi.fn();
+    },
+    createConnection: vi.fn(
+      () =>
+        new (class MockSocket {
+          connect = vi.fn();
+          setTimeout = vi.fn();
+          on = vi.fn();
+          once = vi.fn();
+          end = vi.fn();
+          destroy = vi.fn();
+          removeAllListeners = vi.fn();
+        })()
+    ),
+  };
+});
 
 describe('SshProvisioner', () => {
   let provisioner: SshProvisioner;
@@ -65,8 +87,15 @@ describe('SshProvisioner', () => {
   beforeEach(() => {
     provisioner = new SshProvisioner(defaultConfig);
     vi.clearAllMocks();
-  });
 
+    // Setup default SFTP mock implementations
+    mockSftpConnect.mockResolvedValue(undefined);
+    mockSftpEnd.mockResolvedValue(undefined);
+    mockSftpPut.mockResolvedValue(undefined);
+    mockSftpGet.mockResolvedValue(Buffer.from('test content'));
+    mockSftpStat.mockResolvedValue({});
+    mockSftpMkdir.mockResolvedValue(undefined);
+  });
 
   it('should create instance with custom config', () => {
     const p = new SshProvisioner({
@@ -82,7 +111,6 @@ describe('SshProvisioner', () => {
     const p = new SshProvisioner({});
     expect(p).toBeInstanceOf(SshProvisioner);
   });
-
 
   describe('connect', () => {
     it('should connect with password authentication', async () => {
@@ -222,7 +250,7 @@ describe('SshProvisioner', () => {
 
       // Mock exec response
       const mockStream = {
-        on: vi.fn((event: string, callback: (data: string | number) => void) => {
+        on: vi.fn((event: string, callback: (...args: any[]) => void) => {
           if (event === 'data') {
             callback('output line 1\noutput line 2');
           }
@@ -235,9 +263,11 @@ describe('SshProvisioner', () => {
         },
       };
 
-      mockExec.mockImplementation((_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
-        callback(null, mockStream);
-      });
+      mockExec.mockImplementation(
+        (_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
+          callback(null, mockStream);
+        }
+      );
 
       const result = await provisioner.exec('ls -la');
 
@@ -261,7 +291,7 @@ describe('SshProvisioner', () => {
       });
 
       const mockStream = {
-        on: vi.fn((event: string, callback: (data: string | number) => void) => {
+        on: vi.fn((event: string, callback: (...args: any[]) => void) => {
           if (event === 'close') {
             setTimeout(() => callback(1, ''), 0);
           }
@@ -275,9 +305,11 @@ describe('SshProvisioner', () => {
         },
       };
 
-      mockExec.mockImplementation((_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
-        callback(null, mockStream);
-      });
+      mockExec.mockImplementation(
+        (_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
+          callback(null, mockStream);
+        }
+      );
 
       const result = await provisioner.exec('invalid-command');
 
@@ -304,10 +336,12 @@ describe('SshProvisioner', () => {
         stderr: { on: vi.fn() },
       };
 
-      mockExec.mockImplementation((_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
-        callback(null, mockStream);
-        // Don't trigger close - simulate hanging command
-      });
+      mockExec.mockImplementation(
+        (_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
+          callback(null, mockStream);
+          // Don't trigger close - simulate hanging command
+        }
+      );
 
       const shortTimeoutProvisioner = new SshProvisioner({
         ...defaultConfig,
@@ -341,7 +375,7 @@ describe('SshProvisioner', () => {
       });
 
       const mockStream = {
-        on: vi.fn((event: string, callback: (data: string | number) => void) => {
+        on: vi.fn((event: string, callback: (...args: any[]) => void) => {
           if (event === 'data') {
             callback('success output');
           }
@@ -352,9 +386,11 @@ describe('SshProvisioner', () => {
         stderr: { on: vi.fn() },
       };
 
-      mockExec.mockImplementation((_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
-        callback(null, mockStream);
-      });
+      mockExec.mockImplementation(
+        (_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
+          callback(null, mockStream);
+        }
+      );
 
       const result = await provisioner.execOrFail('echo test');
 
@@ -376,7 +412,7 @@ describe('SshProvisioner', () => {
       });
 
       const mockStream = {
-        on: vi.fn((event: string, callback: (data: string | number) => void) => {
+        on: vi.fn((event: string, callback: (...args: any[]) => void) => {
           if (event === 'close') {
             setTimeout(() => callback(1, ''), 0);
           }
@@ -390,9 +426,11 @@ describe('SshProvisioner', () => {
         },
       };
 
-      mockExec.mockImplementation((_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
-        callback(null, mockStream);
-      });
+      mockExec.mockImplementation(
+        (_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
+          callback(null, mockStream);
+        }
+      );
 
       await expect(provisioner.execOrFail('invalid')).rejects.toThrow('Command failed with code 1');
     });
@@ -415,7 +453,7 @@ describe('SshProvisioner', () => {
 
       let callCount = 0;
       const mockStream = {
-        on: vi.fn((event: string, callback: (data: string | number) => void) => {
+        on: vi.fn((event: string, callback: (...args: any[]) => void) => {
           if (event === 'data') {
             callback(`output ${++callCount}`);
           }
@@ -426,7 +464,7 @@ describe('SshProvisioner', () => {
         stderr: { on: vi.fn() },
       };
 
-      mockExec.mockImplementation((_cmd: string, callback: (err: null, stream: typeof mockStream) => void) => {
+      mockExec.mockImplementation((_cmd: string, callback: (err: null, stream: any) => void) => {
         callback(null, mockStream);
       });
 
@@ -441,7 +479,9 @@ describe('SshProvisioner', () => {
 
   describe('uploadContent', () => {
     it('should throw error if not connected', async () => {
-      await expect(provisioner.uploadContent('test', '/remote/file')).rejects.toThrow('SSH not connected');
+      await expect(provisioner.uploadContent('test', '/remote/file')).rejects.toThrow(
+        'SSH not connected'
+      );
     });
 
     it('should upload content successfully', async () => {
@@ -480,13 +520,7 @@ describe('SshProvisioner', () => {
         password: 'test',
       });
 
-      // Mock SFTP stat to succeed
-      const { default: SftpClient } = await import('ssh2-sftp-client');
-      const mockSftp = vi.mocked(SftpClient).mock.results[0]?.value;
-      if (mockSftp) {
-        mockSftp.stat.mockResolvedValue({});
-      }
-
+      // The mock SFTP client has stat returning {} by default (success)
       const exists = await provisioner.fileExists('/remote/file.txt');
 
       expect(exists).toBe(true);
@@ -506,20 +540,13 @@ describe('SshProvisioner', () => {
         password: 'test',
       });
 
-      // Mock SFTP stat to throw
-      const { default: SftpClient } = await import('ssh2-sftp-client');
-      vi.mocked(SftpClient).mockImplementationOnce(() => ({
-        connect: vi.fn(),
-        end: vi.fn(),
-        put: vi.fn(),
-        get: vi.fn(),
-        mkdir: vi.fn(),
-        stat: vi.fn().mockRejectedValue(new Error('No such file')),
-      } as any));
+      // Override SFTP stat to reject for non-existent file
+      mockSftpStat.mockRejectedValueOnce(new Error('No such file'));
 
       const exists = await provisioner.fileExists('/remote/nonexistent.txt');
 
       expect(exists).toBe(false);
+      expect(mockSftpStat).toHaveBeenCalledWith('/remote/nonexistent.txt');
     });
   });
 
@@ -575,7 +602,11 @@ describe('SshProvisioner', () => {
   describe('waitForSsh', () => {
     it('should resolve when SSH is available', async () => {
       // Spy on private static method checkPort
-      const checkPortSpy = vi.spyOn(SshProvisioner as any, 'checkPort');
+      const checkPortSpy = vi.spyOn(
+        SshProvisioner as unknown as { checkPort: () => Promise<boolean> },
+        'checkPort'
+      );
+      checkPortSpy.mockResolvedValue(true);
       checkPortSpy.mockResolvedValue(true);
 
       await expect(
@@ -584,7 +615,10 @@ describe('SshProvisioner', () => {
     }, 10000);
 
     it('should timeout if SSH never becomes available', async () => {
-      const checkPortSpy = vi.spyOn(SshProvisioner as any, 'checkPort');
+      const checkPortSpy = vi.spyOn(
+        SshProvisioner as unknown as { checkPort: () => Promise<boolean> },
+        'checkPort'
+      );
       checkPortSpy.mockResolvedValue(false);
 
       await expect(
@@ -593,4 +627,3 @@ describe('SshProvisioner', () => {
     });
   });
 });
-
