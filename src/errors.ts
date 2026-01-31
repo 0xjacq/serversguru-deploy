@@ -106,39 +106,64 @@ export type ErrorCode =
  * Documentation URLs for error codes
  */
 const ERROR_DOCS: Partial<Record<ErrorCode, string>> = {
-  API_KEY_INVALID: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/API_KEY_INVALID.md',
-  API_KEY_MISSING: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/API_KEY_MISSING.md',
-  INSUFFICIENT_BALANCE: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/INSUFFICIENT_BALANCE.md',
-  SSH_CONNECTION_TIMEOUT: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/SSH_CONNECTION_TIMEOUT.md',
-  SSH_AUTH_FAILED: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/SSH_AUTH_FAILED.md',
-  DOCKER_PULL_FAILED: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/DOCKER_PULL_FAILED.md',
-  HEALTH_CHECK_FAILED: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/HEALTH_CHECK_FAILED.md',
-  SSL_CERTIFICATE_FAILED: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/SSL_CERTIFICATE_FAILED.md',
-  CONFIG_INVALID: 'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/CONFIG_INVALID.md',
+  API_KEY_INVALID:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/API_KEY_INVALID.md',
+  API_KEY_MISSING:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/API_KEY_MISSING.md',
+  INSUFFICIENT_BALANCE:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/INSUFFICIENT_BALANCE.md',
+  SSH_CONNECTION_TIMEOUT:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/SSH_CONNECTION_TIMEOUT.md',
+  SSH_AUTH_FAILED:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/SSH_AUTH_FAILED.md',
+  DOCKER_PULL_FAILED:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/DOCKER_PULL_FAILED.md',
+  HEALTH_CHECK_FAILED:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/HEALTH_CHECK_FAILED.md',
+  SSL_CERTIFICATE_FAILED:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/SSL_CERTIFICATE_FAILED.md',
+  CONFIG_INVALID:
+    'https://github.com/0xjacq/serversguru-deploy/blob/main/docs/errors/CONFIG_INVALID.md',
 };
 
 /**
  * Default suggestions for error codes
  */
 const ERROR_SUGGESTIONS: Partial<Record<ErrorCode, string>> = {
-  API_KEY_INVALID: 'Check that your SERVERSGURU_API_KEY environment variable is set correctly. Verify the key in your Servers.guru dashboard.',
-  API_KEY_MISSING: 'Set the SERVERSGURU_API_KEY environment variable with your API key from https://my.servers.guru',
+  API_KEY_INVALID:
+    'Check that your SERVERSGURU_API_KEY environment variable is set correctly. Verify the key in your Servers.guru dashboard.',
+  API_KEY_MISSING:
+    'Set the SERVERSGURU_API_KEY environment variable with your API key from https://my.servers.guru',
   API_RATE_LIMIT: 'Wait a few minutes before retrying. Consider adding delays between API calls.',
   INSUFFICIENT_BALANCE: 'Add funds to your Servers.guru account at https://my.servers.guru/billing',
-  VPS_PRODUCT_UNAVAILABLE: 'The requested VPS type is not available. Run "sg-deploy products" to see available options.',
-  VPS_PROVISIONING_TIMEOUT: 'The VPS is taking longer than expected. Check server status manually or contact Servers.guru support.',
-  SSH_CONNECTION_TIMEOUT: 'Check that the server is running, firewall allows SSH (port 22), and the IP address is correct.',
-  SSH_CONNECTION_REFUSED: 'SSH service may not be ready yet. Wait a few minutes and retry, or check server status.',
-  SSH_AUTH_FAILED: 'Verify the server password or SSH key. For new servers, ensure provisioning is complete.',
-  DOCKER_PULL_FAILED: 'Check Docker image name/tag, verify registry credentials, and ensure the image exists.',
-  DOCKER_LOGIN_FAILED: 'Verify DOCKER_REGISTRY_USERNAME and DOCKER_REGISTRY_PASSWORD environment variables.',
-  CONTAINER_UNHEALTHY: 'Check application logs with "docker logs <container>". Verify the health endpoint is correct.',
-  HEALTH_CHECK_FAILED: 'Verify the health endpoint URL and that the application is running on the correct port.',
-  SSL_CERTIFICATE_FAILED: 'Ensure DNS is correctly configured and propagated. Check that port 80 is accessible for ACME challenge.',
-  SSL_DNS_VERIFICATION_FAILED: 'Verify domain DNS records point to the server IP. DNS propagation can take up to 24 hours.',
-  CONFIG_NOT_FOUND: 'Create a configuration file with "sg-deploy init" or specify the path with --config.',
-  CONFIG_VALIDATION_FAILED: 'Check the configuration file syntax and required fields. Run with --dry-run to validate.',
-  ENV_VAR_MISSING: 'Set the required environment variable. Check documentation for required variables.',
+  VPS_PRODUCT_UNAVAILABLE:
+    'The requested VPS type is not available. Run "sg-deploy products" to see available options.',
+  VPS_PROVISIONING_TIMEOUT:
+    'The VPS is taking longer than expected. Check server status manually or contact Servers.guru support.',
+  SSH_CONNECTION_TIMEOUT:
+    'Check that the server is running, firewall allows SSH (port 22), and the IP address is correct.',
+  SSH_CONNECTION_REFUSED:
+    'SSH service may not be ready yet. Wait a few minutes and retry, or check server status.',
+  SSH_AUTH_FAILED:
+    'Verify the server password or SSH key. For new servers, ensure provisioning is complete.',
+  DOCKER_PULL_FAILED:
+    'Check Docker image name/tag, verify registry credentials, and ensure the image exists.',
+  DOCKER_LOGIN_FAILED:
+    'Verify DOCKER_REGISTRY_USERNAME and DOCKER_REGISTRY_PASSWORD environment variables.',
+  CONTAINER_UNHEALTHY:
+    'Check application logs with "docker logs <container>". Verify the health endpoint is correct.',
+  HEALTH_CHECK_FAILED:
+    'Verify the health endpoint URL and that the application is running on the correct port.',
+  SSL_CERTIFICATE_FAILED:
+    'Ensure DNS is correctly configured and propagated. Check that port 80 is accessible for ACME challenge.',
+  SSL_DNS_VERIFICATION_FAILED:
+    'Verify domain DNS records point to the server IP. DNS propagation can take up to 24 hours.',
+  CONFIG_NOT_FOUND:
+    'Create a configuration file with "sg-deploy init" or specify the path with --config.',
+  CONFIG_VALIDATION_FAILED:
+    'Check the configuration file syntax and required fields. Run with --dry-run to validate.',
+  ENV_VAR_MISSING:
+    'Set the required environment variable. Check documentation for required variables.',
 };
 
 /**
@@ -181,9 +206,7 @@ export class DeploymentError extends Error {
    * Format error for console output
    */
   toConsoleString(): string {
-    const lines: string[] = [
-      `Error [${this.code}]: ${this.message}`,
-    ];
+    const lines: string[] = [`Error [${this.code}]: ${this.message}`];
 
     if (this.context?.step) {
       lines.push(`  Step: ${this.context.step}`);
