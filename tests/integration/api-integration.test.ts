@@ -223,6 +223,12 @@ describe('ServersGuruClient Integration', () => {
         billingCycle: 1,
       });
 
+      // Wait for provisioning to complete before testing power actions
+      await client.waitForStatus(orderResult.serverId, 'running', {
+        timeout: 5000,
+        pollInterval: 100,
+      });
+
       await client.stopServer(orderResult.serverId);
 
       let status = await client.getServerStatus(orderResult.serverId);

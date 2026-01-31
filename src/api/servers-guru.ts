@@ -294,7 +294,19 @@ export class ServersGuruClient {
       hostname: config.hostname,
     });
 
-    // Handle direct success format (actual API)
+    // Handle wrapped format (legacy) - has data field with server details
+    if ('data' in response && response.data) {
+      const data = response.data as { serverId: number; ipv4: string; password: string };
+      return {
+        success: true,
+        serverId: data.serverId,
+        ipv4: data.ipv4,
+        password: data.password,
+        message: (response as ApiResponse<unknown>).message,
+      };
+    }
+
+    // Handle direct success format (actual API) - no data field, just {success: true}
     if ('success' in response && response.success === true) {
       // Poll for the new server (wait up to 60 seconds)
       const maxAttempts = 12;
@@ -320,19 +332,13 @@ export class ServersGuruClient {
       throw new ServersGuruApiError(response.error);
     }
 
-    // Handle wrapped format (legacy)
+    // Handle wrapped format failure
     const wrapped = response as ApiResponse<{ serverId: number; ipv4: string; password: string }>;
-    if (!wrapped.success || !wrapped.data) {
+    if (!wrapped.success) {
       throw new ServersGuruApiError(wrapped.message ?? wrapped.error ?? 'Failed to order VPS');
     }
 
-    return {
-      success: true,
-      serverId: wrapped.data.serverId,
-      ipv4: wrapped.data.ipv4,
-      password: wrapped.data.password,
-      message: wrapped.message,
-    };
+    throw new ServersGuruApiError('Unexpected response format from orderVps API');
   }
 
   /**

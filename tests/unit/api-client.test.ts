@@ -101,7 +101,7 @@ describe('ServersGuruClient', () => {
 
   describe('orderVps', () => {
     it('should order VPS and return credentials', async () => {
-      const mockResponse = {
+      const mockOrderResponse = {
         success: true,
         data: {
           serverId: 12345,
@@ -110,10 +110,17 @@ describe('ServersGuruClient', () => {
         },
       };
 
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => Promise.resolve(mockResponse),
-      });
+      // Mock listServers (called before order) and orderVps response
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => Promise.resolve({ Servers: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => Promise.resolve(mockOrderResponse),
+        });
 
       const result = await client.orderVps({
         vpsType: 'NL1-2',
@@ -128,10 +135,17 @@ describe('ServersGuruClient', () => {
     });
 
     it('should throw on order failure', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => Promise.resolve({ success: false, message: 'Insufficient balance' }),
-      });
+      // Mock listServers (called before order) and orderVps failure response
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => Promise.resolve({ Servers: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => Promise.resolve({ success: false, message: 'Insufficient balance' }),
+        });
 
       await expect(
         client.orderVps({

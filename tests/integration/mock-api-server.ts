@@ -419,9 +419,10 @@ export class MockServersGuruApi {
       case 'power':
         if (method === 'POST') {
           const powerBody = body as { powerType?: string };
-          if (powerBody.powerType === 'start') {
+          // Accept both old names (start/shutdown) and new names (on/off)
+          if (powerBody.powerType === 'on' || powerBody.powerType === 'start') {
             server.status = 'running';
-          } else if (powerBody.powerType === 'shutdown') {
+          } else if (powerBody.powerType === 'off' || powerBody.powerType === 'shutdown') {
             server.status = 'stopped';
           } else if (powerBody.powerType === 'reboot') {
             server.status = 'provisioning';
