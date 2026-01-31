@@ -73,22 +73,22 @@ Edit `deploy.yaml`:
 
 ```yaml
 serversGuru:
-  apiKey: "${SERVERSGURU_API_KEY}"  # Use env var for security
+  apiKey: '${SERVERSGURU_API_KEY}' # Use env var for security
 
 vps:
-  type: "NL1-2"              # VPS product type
-  osImage: "ubuntu-22.04"    # OS image
-  billingCycle: 1            # Months (1-12)
+  type: 'NL1-2' # VPS product type
+  osImage: 'ubuntu-22.04' # OS image
+  billingCycle: 1 # Months (1-12)
 
 app:
-  name: "my-app"
-  dockerImage: "nginx:latest"
+  name: 'my-app'
+  dockerImage: 'nginx:latest'
   port: 80
-  healthEndpoint: "/"
+  healthEndpoint: '/'
 
 domain:
-  name: "app.example.com"
-  email: "admin@example.com"
+  name: 'app.example.com'
+  email: 'admin@example.com'
 ```
 
 ### 4. Set environment variables
@@ -267,7 +267,7 @@ try {
     console.error(`Error [${error.code}]: ${error.message}`);
     console.error(`Suggestion: ${error.suggestion}`);
     console.error(`Docs: ${error.docsUrl}`);
-    
+
     if (isRetryableError(error)) {
       console.log('This error is retryable');
     }
@@ -310,7 +310,10 @@ console.log(`Balance: $${balance}`);
 
 // List products
 const products = await client.getProducts();
-console.log('Available VPS types:', products.map(p => p.id));
+console.log(
+  'Available VPS types:',
+  products.map((p) => p.id)
+);
 
 // Order VPS
 const order = await client.orderVps({
@@ -329,59 +332,59 @@ See [API Documentation](docs/API.md) for complete API reference.
 
 ```yaml
 serversGuru:
-  apiKey: "${SERVERSGURU_API_KEY}"  # Use env var for security
-  baseUrl: https://my.servers.guru/api  # Optional
+  apiKey: '${SERVERSGURU_API_KEY}' # Use env var for security
+  baseUrl: https://my.servers.guru/api # Optional
 
 vps:
-  type: "NL1-2"              # VPS product type (use 'sg-deploy products' to list)
-  osImage: "ubuntu-22.04"    # OS image (use 'sg-deploy images' to list)
-  billingCycle: 1            # Months (1-12)
-  hostname: "my-app"         # Optional hostname
+  type: 'NL1-2' # VPS product type (use 'sg-deploy products' to list)
+  osImage: 'ubuntu-22.04' # OS image (use 'sg-deploy images' to list)
+  billingCycle: 1 # Months (1-12)
+  hostname: 'my-app' # Optional hostname
 
 ssh:
   port: 22
   username: root
-  privateKeyPath: ~/.ssh/id_rsa  # Optional - use key auth instead of password
-  connectionTimeout: 30000   # 30 seconds
-  commandTimeout: 300000     # 5 minutes
+  privateKeyPath: ~/.ssh/id_rsa # Optional - use key auth instead of password
+  connectionTimeout: 30000 # 30 seconds
+  commandTimeout: 300000 # 5 minutes
 
 app:
-  name: "my-app"
-  dockerImage: "ghcr.io/user/my-app:latest"
-  registryAuth:              # Optional - for private registries
-    username: "${DOCKER_REGISTRY_USERNAME}"
-    password: "${DOCKER_REGISTRY_PASSWORD}"
+  name: 'my-app'
+  dockerImage: 'ghcr.io/user/my-app:latest'
+  registryAuth: # Optional - for private registries
+    username: '${DOCKER_REGISTRY_USERNAME}'
+    password: '${DOCKER_REGISTRY_PASSWORD}'
     registry: ghcr.io
   envVars:
     NODE_ENV: production
-    PORT: "3000"
-  healthEndpoint: "/api/status"
+    PORT: '3000'
+  healthEndpoint: '/api/status'
   port: 3000
   volumes:
-    - "./data:/app/data"
-    - "./logs:/app/logs"
+    - './data:/app/data'
+    - './logs:/app/logs'
 
-domain:                      # Optional - skip for IP-only access
-  name: "app.example.com"
-  email: "admin@example.com"  # For Let's Encrypt
+domain: # Optional - skip for IP-only access
+  name: 'app.example.com'
+  email: 'admin@example.com' # For Let's Encrypt
 
 options:
   createSnapshot: true
   healthCheckRetries: 10
   healthCheckInterval: 5000
-  provisioningTimeout: 600000   # 10 minutes
-  setupTimeout: 900000          # 15 minutes
+  provisioningTimeout: 600000 # 10 minutes
+  setupTimeout: 900000 # 15 minutes
 ```
 
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SERVERSGURU_API_KEY` | Your Servers.guru API key | Yes |
-| `DOCKER_REGISTRY_USERNAME` | Docker registry username | For private images |
-| `DOCKER_REGISTRY_PASSWORD` | Docker registry password/token | For private images |
-| `DOCKER_REGISTRY` | Docker registry URL | Optional (default: ghcr.io) |
-| `LOG_LEVEL` | Log level (debug, info, warn, error) | Optional (default: info) |
+| Variable                   | Description                          | Required                    |
+| -------------------------- | ------------------------------------ | --------------------------- |
+| `SERVERSGURU_API_KEY`      | Your Servers.guru API key            | Yes                         |
+| `DOCKER_REGISTRY_USERNAME` | Docker registry username             | For private images          |
+| `DOCKER_REGISTRY_PASSWORD` | Docker registry password/token       | For private images          |
+| `DOCKER_REGISTRY`          | Docker registry URL                  | Optional (default: ghcr.io) |
+| `LOG_LEVEL`                | Log level (debug, info, warn, error) | Optional (default: info)    |
 
 ### Programmatic Configuration
 
@@ -458,6 +461,185 @@ Add funds to your Servers.guru account at https://my.servers.guru/billing
 - Check that your application is running on the correct port
 - View logs: `ssh root@<ip> "docker logs <app-name>"`
 
+### Network and Firewall Issues
+
+The deployment requires these ports to be accessible:
+
+| Port     | Protocol | Purpose                             |
+| -------- | -------- | ----------------------------------- |
+| 22       | TCP      | SSH access for provisioning         |
+| 80       | TCP      | HTTP (required for SSL certificate) |
+| 443      | TCP      | HTTPS (your application)            |
+| App port | TCP      | Your application port (e.g., 3000)  |
+
+If you're behind a corporate firewall or VPN:
+
+- Ensure outbound SSH (port 22) is allowed
+- Verify you can reach Servers.guru API endpoints
+
+### Docker Registry Authentication
+
+For private registries, set credentials in your config:
+
+```yaml
+app:
+  registryAuth:
+    username: '${DOCKER_REGISTRY_USERNAME}'
+    password: '${DOCKER_REGISTRY_PASSWORD}'
+    registry: ghcr.io # or docker.io, your-registry.com
+```
+
+**GitHub Container Registry (ghcr.io):**
+
+```bash
+export DOCKER_REGISTRY_USERNAME="your-github-username"
+export DOCKER_REGISTRY_PASSWORD="ghp_your-personal-access-token"
+```
+
+**Docker Hub:**
+
+```bash
+export DOCKER_REGISTRY_USERNAME="your-dockerhub-username"
+export DOCKER_REGISTRY_PASSWORD="your-access-token"
+```
+
+### SSL Certificate Issues
+
+**Let's Encrypt rate limits:**
+
+- 5 certificates per domain per week
+- 50 certificates per registered domain per week
+- Wait or use a different subdomain if rate limited
+
+**DNS propagation:**
+
+- Ensure DNS A record points to server IP
+- Use `dig your-domain.com` to verify
+- Propagation can take up to 24-48 hours
+
+**Port 80 blocked:**
+
+- Let's Encrypt requires port 80 for HTTP-01 challenge
+- Ensure no firewall blocks port 80
+- Temporarily disable any existing web server
+
+### Snapshot Failures
+
+**"Snapshot create failed":**
+
+- Ensure sufficient disk space on VPS
+- Check provider snapshot limits (usually 3-5 per server)
+- Delete old snapshots: `sg-deploy snapshots --server-id <id>`
+
+**Snapshot restoration issues:**
+
+- Server must be stopped for some providers
+- Restoration can take 5-15 minutes
+- Verify snapshot exists: `sg-deploy snapshots --server-id <id>`
+
+### VPS Provisioning Delays
+
+**Server stuck in "provisioning":**
+
+- Provisioning typically takes 2-5 minutes
+- Check server status: `sg-deploy status --server-id <id>`
+- Increase `provisioningTimeout` in config (default: 10 minutes)
+
+**VPS type unavailable:**
+
+- Check available products: `sg-deploy products`
+- Try a different location or VPS type
+- Contact Servers.guru support for stock ETA
+
+### SSH Connection Issues
+
+**"SSH host key mismatch":**
+
+```bash
+# Remove old host key (server was rebuilt)
+ssh-keygen -R <server-ip>
+```
+
+**"Permission denied (publickey)":**
+
+- Verify SSH key format (OpenSSH or PEM)
+- Check key file permissions: `chmod 600 ~/.ssh/id_rsa`
+- Ensure private key matches the public key on server
+
+**SSH key configuration:**
+
+```yaml
+ssh:
+  privateKeyPath: ~/.ssh/id_rsa # Path to private key
+  # OR use password authentication (default for new VPS)
+```
+
+### App Health Check Failures
+
+**Timeout issues:**
+
+```yaml
+options:
+  healthCheckRetries: 20 # Increase retries (default: 10)
+  healthCheckInterval: 5000 # Interval between checks in ms
+```
+
+**Endpoint configuration:**
+
+- Health endpoint must return HTTP 200
+- Default timeout is 5 seconds per check
+- Example health endpoint:
+  ```javascript
+  app.get('/health', (req, res) => res.json({ status: 'ok' }));
+  ```
+
+**Debugging health checks:**
+
+```bash
+# SSH to server and test endpoint
+ssh root@<ip>
+curl -v http://localhost:3000/health
+
+# Check container logs
+docker logs <app-name>
+
+# Check if container is running
+docker ps
+```
+
+### Memory and Resource Issues
+
+**VPS sizing guide:**
+
+| App Type            | Recommended VPS | RAM   | vCPUs |
+| ------------------- | --------------- | ----- | ----- |
+| Static site         | NL1-1           | 1GB   | 1     |
+| Simple Node.js      | NL1-2           | 2GB   | 2     |
+| Next.js / React SSR | NL1-2 or NL1-4  | 2-4GB | 2-4   |
+| Multi-container     | NL1-4+          | 4GB+  | 4+    |
+| Database + App      | NL1-4+          | 4GB+  | 4+    |
+
+**"Container OOM killed":**
+
+- Increase VPS RAM (upgrade VPS type)
+- Optimize application memory usage
+- Add memory limits to container:
+  ```yaml
+  app:
+    envVars:
+      NODE_OPTIONS: '--max-old-space-size=1024'
+  ```
+
+**Disk space issues:**
+
+```bash
+# Check disk usage
+ssh root@<ip> "df -h"
+
+# Clean Docker resources
+ssh root@<ip> "docker system prune -af"
+```
+
 ### Debug Mode
 
 Enable verbose logging:
@@ -469,6 +651,8 @@ LOG_LEVEL=debug sg-deploy deploy
 ### Getting Help
 
 - [API Documentation](docs/API.md)
+- [Configuration Reference](docs/CONFIGURATION.md)
+- [Advanced Usage Guide](docs/ADVANCED.md)
 - [GitHub Issues](https://github.com/0xjacq/serversguru-deploy/issues)
 - [Servers.guru Documentation](https://my.servers.guru/docs)
 

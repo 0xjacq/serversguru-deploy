@@ -5,6 +5,9 @@
  */
 
 // Main library exports
+// Version - read dynamically from package.json
+import { createRequire } from 'module';
+
 export { DeploymentOrchestrator } from './orchestrator.js';
 export { ServersGuruClient, ServersGuruApiError } from './api/servers-guru.js';
 export { SshProvisioner } from './ssh/provisioner.js';
@@ -57,6 +60,6 @@ export {
   type PreflightContext,
   type PreflightCheckResults,
 } from './preflight.js';
-
-// Version
-export const VERSION = '1.0.1';
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json') as { version: string };
+export const VERSION = version;

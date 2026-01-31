@@ -1,0 +1,41 @@
+# Next.js deployment configuration
+
+serversGuru:
+  apiKey: '${SERVERSGURU_API_KEY}'
+
+vps:
+  type: 'NL1-2'
+  osImage: 'ubuntu-22.04'
+  billingCycle: 1
+  hostname: 'nextjs-app'
+
+ssh:
+  port: 22
+  username: root
+  connectionTimeout: 30000
+  commandTimeout: 300000
+
+app:
+  name: 'nextjs-app'
+  dockerImage: 'ghcr.io/your-username/my-nextjs-app:latest'
+  registryAuth:
+    username: '${DOCKER_REGISTRY_USERNAME}'
+    password: '${DOCKER_REGISTRY_PASSWORD}'
+    registry: ghcr.io
+  port: 3000
+  healthEndpoint: '/api/health'
+  envVars:
+    NODE_ENV: 'production'
+    NEXT_TELEMETRY_DISABLED: '1'
+
+# Configure your domain for SSL
+domain:
+  name: 'app.example.com'
+  email: 'admin@example.com'
+
+options:
+  createSnapshot: true
+  healthCheckRetries: 15
+  healthCheckInterval: 5000
+  provisioningTimeout: 600000
+  setupTimeout: 900000

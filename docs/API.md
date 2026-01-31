@@ -60,6 +60,7 @@ Execute a full deployment from ordering a VPS to health verification.
 **Returns:** [`DeploymentResult`](#deploymentresult)
 
 **Example:**
+
 ```typescript
 const result = await orchestrator.deploy();
 console.log(`Server ID: ${result.serverId}`);
@@ -72,6 +73,7 @@ console.log(`Health Check: ${result.healthCheckPassed ? 'PASSED' : 'FAILED'}`);
 Deploy to an existing VPS, skipping the ordering and provisioning steps.
 
 **Parameters:**
+
 - `serverId` - Existing server ID
 - `serverIp` - Server IP address
 - `password` - Server root password
@@ -79,6 +81,7 @@ Deploy to an existing VPS, skipping the ordering and provisioning steps.
 **Returns:** [`DeploymentResult`](#deploymentresult)
 
 **Example:**
+
 ```typescript
 const result = await orchestrator.deployToExisting(12345, '192.168.1.100', 'password');
 ```
@@ -88,9 +91,11 @@ const result = await orchestrator.deployToExisting(12345, '192.168.1.100', 'pass
 Rollback the server to a previous snapshot.
 
 **Parameters:**
+
 - `snapshotId` - Snapshot ID to restore
 
 **Example:**
+
 ```typescript
 await orchestrator.rollback(999);
 ```
@@ -100,9 +105,11 @@ await orchestrator.rollback(999);
 Set a callback function to receive deployment progress updates.
 
 **Parameters:**
+
 - `callback` - Function called with `(step, message, progress?)`
 
 **Example:**
+
 ```typescript
 orchestrator.setProgressCallback((step, message, progress) => {
   console.log(`${step}: ${message}`);
@@ -167,6 +174,7 @@ Get available OS images.
 List all servers.
 
 **Parameters:**
+
 - `options.search` - Filter by name
 - `options.page` - Page number
 - `options.perPage` - Items per page
@@ -178,6 +186,7 @@ List all servers.
 Get server details.
 
 **Parameters:**
+
 - `id` - Server ID
 
 **Returns:** [`ServerInfo`](#serverinfo)
@@ -187,6 +196,7 @@ Get server details.
 Get server status.
 
 **Parameters:**
+
 - `id` - Server ID
 
 **Returns:** [`ServerStatus`](#serverstatus)
@@ -196,6 +206,7 @@ Get server status.
 Order a new VPS.
 
 **Parameters:**
+
 - `config.vpsType` - VPS product type (e.g., 'NL1-2')
 - `config.osImage` - OS image (e.g., 'ubuntu-22.04')
 - `config.billingCycle` - Billing cycle in months (1-12)
@@ -230,6 +241,7 @@ List server snapshots.
 Create a snapshot.
 
 **Parameters:**
+
 - `serverId` - Server ID
 - `name` - Optional snapshot name
 
@@ -244,6 +256,7 @@ Restore a snapshot.
 Wait for server to reach a specific status.
 
 **Parameters:**
+
 - `id` - Server ID
 - `targetStatus` - Target status ('running', 'stopped', etc.)
 - `options.timeout` - Timeout in milliseconds
@@ -286,6 +299,7 @@ await ssh.disconnect();
 Connect to a server.
 
 **Parameters:**
+
 - `credentials.host` - Server IP or hostname
 - `credentials.port` - SSH port (default: 22)
 - `credentials.username` - Username
@@ -301,6 +315,7 @@ Disconnect from server.
 Execute a command.
 
 **Parameters:**
+
 - `command` - Command to execute
 - `options.timeout` - Command timeout in milliseconds
 
@@ -353,6 +368,7 @@ Check if connected.
 Wait for SSH to become available.
 
 **Parameters:**
+
 - `host` - Server IP or hostname
 - `options.port` - SSH port
 - `options.timeout` - Timeout in milliseconds
@@ -516,11 +532,7 @@ interface ExecResult {
 ### ProgressCallback
 
 ```typescript
-type ProgressCallback = (
-  step: DeploymentStep,
-  message: string,
-  progress?: number
-) => void;
+type ProgressCallback = (step: DeploymentStep, message: string, progress?: number) => void;
 ```
 
 ### DeploymentStep
@@ -563,16 +575,192 @@ try {
 
 ### Error Codes
 
-- `API_KEY_INVALID` - Invalid API key
-- `INSUFFICIENT_BALANCE` - Not enough funds
-- `VPS_PROVISIONING_FAILED` - VPS failed to provision
-- `SSH_CONNECTION_TIMEOUT` - Cannot connect via SSH
-- `DOCKER_PULL_FAILED` - Cannot pull Docker image
-- `HEALTH_CHECK_FAILED` - Application health check failed
-- `SSL_CERTIFICATE_FAILED` - SSL certificate generation failed
-- `CONFIG_INVALID` - Invalid configuration
+Complete reference of all error codes with descriptions and recovery strategies.
 
-See [`src/errors.ts`](../src/errors.ts) for complete list.
+#### API Errors
+
+| Code                   | Description                   | Retryable | Recovery Strategy                              |
+| ---------------------- | ----------------------------- | --------- | ---------------------------------------------- |
+| `API_KEY_INVALID`      | API key is invalid or revoked | No        | Verify API key in Servers.guru dashboard       |
+| `API_KEY_MISSING`      | No API key provided           | No        | Set `SERVERSGURU_API_KEY` environment variable |
+| `API_RATE_LIMIT`       | Too many API requests         | Yes       | Wait 60 seconds, then retry                    |
+| `API_TIMEOUT`          | API request timed out         | Yes       | Retry after 5 seconds                          |
+| `API_UNKNOWN_ERROR`    | Unexpected API error          | Maybe     | Check API status, retry once                   |
+| `INSUFFICIENT_BALANCE` | Account balance too low       | No        | Add funds at my.servers.guru/billing           |
+
+#### VPS Errors
+
+| Code                       | Description             | Retryable | Recovery Strategy                    |
+| -------------------------- | ----------------------- | --------- | ------------------------------------ |
+| `VPS_PRODUCT_UNAVAILABLE`  | VPS type out of stock   | No        | Choose different VPS type            |
+| `VPS_IMAGE_UNAVAILABLE`    | OS image not available  | No        | Choose different OS image            |
+| `VPS_ORDER_FAILED`         | Failed to order VPS     | No        | Check balance, try again             |
+| `VPS_PROVISIONING_FAILED`  | VPS failed during setup | No        | Contact support                      |
+| `VPS_PROVISIONING_TIMEOUT` | VPS taking too long     | Yes       | Increase timeout, retry              |
+| `SERVER_NOT_FOUND`         | Server ID not found     | No        | Verify server ID                     |
+| `SERVER_ERROR_STATE`       | Server in error state   | No        | Check server status, contact support |
+
+#### SSH Errors
+
+| Code                       | Description                     | Retryable | Recovery Strategy                    |
+| -------------------------- | ------------------------------- | --------- | ------------------------------------ |
+| `SSH_CONNECTION_TIMEOUT`   | Cannot establish SSH connection | Yes       | Wait for server, check firewall      |
+| `SSH_CONNECTION_REFUSED`   | SSH port not responding         | Yes       | Wait for SSH service to start        |
+| `SSH_AUTH_FAILED`          | Authentication failed           | No        | Verify password/SSH key              |
+| `SSH_HOST_KEY_MISMATCH`    | Host key changed                | No        | Remove old key: `ssh-keygen -R <ip>` |
+| `SSH_COMMAND_TIMEOUT`      | Command execution timeout       | Yes       | Increase `commandTimeout`            |
+| `SSH_COMMAND_FAILED`       | Command returned non-zero       | No        | Check command output                 |
+| `SSH_FILE_TRANSFER_FAILED` | SFTP transfer failed            | Yes       | Check disk space, retry              |
+
+#### Docker Errors
+
+| Code                     | Description                    | Retryable | Recovery Strategy               |
+| ------------------------ | ------------------------------ | --------- | ------------------------------- |
+| `DOCKER_NOT_INSTALLED`   | Docker not found on server     | No        | Use supported OS image          |
+| `DOCKER_PULL_FAILED`     | Cannot pull Docker image       | Yes       | Check image name, registry auth |
+| `DOCKER_LOGIN_FAILED`    | Registry authentication failed | No        | Verify registry credentials     |
+| `DOCKER_COMPOSE_FAILED`  | Docker Compose error           | No        | Check compose file syntax       |
+| `CONTAINER_UNHEALTHY`    | Container health check failed  | Yes       | Check container logs            |
+| `CONTAINER_START_FAILED` | Container failed to start      | No        | Check container logs            |
+
+#### Nginx Errors
+
+| Code                   | Description                 | Retryable | Recovery Strategy          |
+| ---------------------- | --------------------------- | --------- | -------------------------- |
+| `NGINX_CONFIG_INVALID` | Invalid Nginx configuration | No        | Check configuration syntax |
+| `NGINX_RELOAD_FAILED`  | Failed to reload Nginx      | No        | Check error logs           |
+
+#### SSL Errors
+
+| Code                          | Description                | Retryable | Recovery Strategy                   |
+| ----------------------------- | -------------------------- | --------- | ----------------------------------- |
+| `SSL_CERTIFICATE_FAILED`      | Let's Encrypt failed       | Maybe     | Check DNS, port 80 access           |
+| `SSL_DNS_VERIFICATION_FAILED` | DNS verification failed    | No        | Verify DNS A record                 |
+| `SSL_RATE_LIMIT`              | Let's Encrypt rate limited | No        | Wait 1 week or use different domain |
+
+#### Configuration Errors
+
+| Code                       | Description                | Retryable | Recovery Strategy                   |
+| -------------------------- | -------------------------- | --------- | ----------------------------------- |
+| `CONFIG_NOT_FOUND`         | Config file not found      | No        | Create config with `sg-deploy init` |
+| `CONFIG_INVALID`           | Configuration syntax error | No        | Validate YAML syntax                |
+| `CONFIG_VALIDATION_FAILED` | Schema validation failed   | No        | Check required fields               |
+| `ENV_VAR_MISSING`          | Required env var not set   | No        | Set the environment variable        |
+
+#### Health Check Errors
+
+| Code                   | Description             | Retryable | Recovery Strategy         |
+| ---------------------- | ----------------------- | --------- | ------------------------- |
+| `HEALTH_CHECK_FAILED`  | App health check failed | Yes       | Check app logs, endpoint  |
+| `HEALTH_CHECK_TIMEOUT` | Health check timed out  | Yes       | Increase retries/interval |
+
+#### Snapshot Errors
+
+| Code                      | Description             | Retryable | Recovery Strategy        |
+| ------------------------- | ----------------------- | --------- | ------------------------ |
+| `SNAPSHOT_CREATE_FAILED`  | Cannot create snapshot  | No        | Check disk space, limits |
+| `SNAPSHOT_RESTORE_FAILED` | Cannot restore snapshot | No        | Verify snapshot exists   |
+| `SNAPSHOT_NOT_FOUND`      | Snapshot ID not found   | No        | List available snapshots |
+
+#### Generic Errors
+
+| Code                   | Description                | Retryable | Recovery Strategy        |
+| ---------------------- | -------------------------- | --------- | ------------------------ |
+| `DEPLOYMENT_CANCELLED` | Deployment was cancelled   | No        | Restart deployment       |
+| `DEPLOYMENT_TIMEOUT`   | Overall deployment timeout | Maybe     | Increase timeouts        |
+| `UNKNOWN_ERROR`        | Unexpected error           | Maybe     | Check logs, report issue |
+
+### Error Handling Examples
+
+#### Basic Error Handling
+
+```typescript
+import { DeploymentError, isRetryableError, getRetryDelay } from 'serversguru-deploy';
+
+try {
+  await orchestrator.deploy();
+} catch (error) {
+  if (error instanceof DeploymentError) {
+    console.error(`[${error.code}] ${error.message}`);
+
+    if (error.suggestion) {
+      console.log(`Suggestion: ${error.suggestion}`);
+    }
+
+    if (error.docsUrl) {
+      console.log(`Documentation: ${error.docsUrl}`);
+    }
+  }
+}
+```
+
+#### Retry Logic
+
+```typescript
+import { DeploymentError, isRetryableError, getRetryDelay } from 'serversguru-deploy';
+
+async function deployWithRetry(maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await orchestrator.deploy();
+    } catch (error) {
+      if (error instanceof DeploymentError && isRetryableError(error)) {
+        const delay = getRetryDelay(error);
+        console.log(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        throw error; // Non-retryable error
+      }
+    }
+  }
+  throw new Error(`Deployment failed after ${maxRetries} attempts`);
+}
+```
+
+#### Error Context
+
+```typescript
+try {
+  await orchestrator.deploy();
+} catch (error) {
+  if (error instanceof DeploymentError && error.context) {
+    console.log(`Failed at step: ${error.context.step}`);
+    console.log(`Server ID: ${error.context.serverId}`);
+    console.log(`Server IP: ${error.context.serverIp}`);
+  }
+}
+```
+
+#### Formatting Errors
+
+```typescript
+// Console-friendly format
+console.error(error.toConsoleString());
+// Output:
+// Error [SSH_CONNECTION_TIMEOUT]: Cannot connect to server
+//   Step: wait-ssh
+//   Server IP: 1.2.3.4
+//
+//   Suggestion: Check that the server is running...
+//   Documentation: https://github.com/...
+
+// JSON format (for logging systems)
+console.log(JSON.stringify(error.toJSON(), null, 2));
+```
+
+### Error Class Hierarchy
+
+```
+Error
+└── DeploymentError (base class)
+    ├── ConfigError     (configuration issues)
+    ├── ApiError        (API communication issues)
+    ├── SshError        (SSH connection/execution issues)
+    ├── ValidationError (schema validation issues)
+    └── AggregateDeploymentError (multiple errors)
+```
+
+See [`src/errors.ts`](../src/errors.ts) for complete implementation.
 
 ---
 

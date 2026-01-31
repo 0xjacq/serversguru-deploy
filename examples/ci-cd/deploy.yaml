@@ -1,0 +1,35 @@
+# Base deployment configuration
+# Environment-specific overrides in deploy.staging.yaml and deploy.production.yaml
+
+serversGuru:
+  apiKey: '${SERVERSGURU_API_KEY}'
+
+vps:
+  type: 'NL1-2'
+  osImage: 'ubuntu-22.04'
+  billingCycle: 1
+
+ssh:
+  port: 22
+  username: root
+  connectionTimeout: 30000
+  commandTimeout: 300000
+
+app:
+  name: 'myapp'
+  dockerImage: 'ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_SHA}'
+  registryAuth:
+    username: '${DOCKER_REGISTRY_USERNAME}'
+    password: '${DOCKER_REGISTRY_PASSWORD}'
+    registry: ghcr.io
+  port: 3000
+  healthEndpoint: '/health'
+  envVars:
+    NODE_ENV: 'production'
+
+options:
+  createSnapshot: true
+  healthCheckRetries: 15
+  healthCheckInterval: 5000
+  provisioningTimeout: 600000
+  setupTimeout: 900000

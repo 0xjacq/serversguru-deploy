@@ -1,0 +1,42 @@
+# Production environment configuration
+# Extends deploy.yaml with production-specific settings
+
+serversGuru:
+  apiKey: '${SERVERSGURU_API_KEY}'
+
+vps:
+  type: 'NL1-4' # Larger instance for production
+  osImage: 'ubuntu-22.04'
+  billingCycle: 12 # Annual billing for discount
+  hostname: 'production-app'
+
+ssh:
+  port: 22
+  username: root
+  connectionTimeout: 30000
+  commandTimeout: 300000
+
+app:
+  name: 'myapp'
+  dockerImage: 'ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_SHA}'
+  registryAuth:
+    username: '${DOCKER_REGISTRY_USERNAME}'
+    password: '${DOCKER_REGISTRY_PASSWORD}'
+    registry: ghcr.io
+  port: 3000
+  healthEndpoint: '/health'
+  envVars:
+    NODE_ENV: 'production'
+    LOG_LEVEL: 'info'
+    DATABASE_URL: '${PRODUCTION_DATABASE_URL}'
+
+domain:
+  name: 'app.example.com'
+  email: 'devops@example.com'
+
+options:
+  createSnapshot: true
+  healthCheckRetries: 20 # More retries for production
+  healthCheckInterval: 5000
+  provisioningTimeout: 600000
+  setupTimeout: 1200000 # Longer timeout for production
