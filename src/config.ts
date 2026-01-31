@@ -45,7 +45,7 @@ export const AppConfigSchema = z.object({
  */
 export const DomainConfigSchema = z.object({
   name: z.string().min(1, 'Domain name is required'),
-  email: z.string().email('Valid email required for Let\'s Encrypt'),
+  email: z.string().email("Valid email required for Let's Encrypt"),
 });
 
 /**
@@ -79,13 +79,15 @@ export const DeploymentConfigSchema = z.object({
   domain: DomainConfigSchema.optional(),
 
   // Deployment options
-  options: z.object({
-    createSnapshot: z.boolean().default(true),
-    healthCheckRetries: z.number().int().default(10),
-    healthCheckInterval: z.number().int().default(5000),
-    provisioningTimeout: z.number().int().default(600000), // 10 minutes
-    setupTimeout: z.number().int().default(900000), // 15 minutes
-  }).default({}),
+  options: z
+    .object({
+      createSnapshot: z.boolean().default(true),
+      healthCheckRetries: z.number().int().default(10),
+      healthCheckInterval: z.number().int().default(5000),
+      provisioningTimeout: z.number().int().default(600000), // 10 minutes
+      setupTimeout: z.number().int().default(900000), // 15 minutes
+    })
+    .default({}),
 });
 
 // Export types
@@ -117,7 +119,7 @@ export interface ServerInfo {
  * Server status response
  */
 export interface ServerStatus {
-  status: 'running' | 'stopped' | 'provisioning' | 'error' | string;
+  status: 'running' | 'stopped' | 'provisioning' | 'error' | (string & {});
   uptime?: number;
   cpuUsage?: number;
   memoryUsage?: number;

@@ -64,11 +64,7 @@ export class ServersGuruClient {
   /**
    * Make an authenticated API request
    */
-  private async request<T>(
-    method: string,
-    endpoint: string,
-    body?: unknown
-  ): Promise<T> {
+  private async request<T>(method: string, endpoint: string, body?: unknown): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers: Record<string, string> = {
       'X-API-KEY': this.apiKey,
@@ -81,7 +77,7 @@ export class ServersGuruClient {
       headers,
     };
 
-    if (body) {
+    if (body !== undefined && body !== null) {
       options.body = JSON.stringify(body);
     }
 
@@ -90,9 +86,9 @@ export class ServersGuruClient {
     if (!response.ok) {
       let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
       try {
-        const errorData = await response.json() as { message?: string; error?: string };
-        if (errorData.message || errorData.error) {
-          errorMessage = `${errorData.message || errorData.error} (${response.status})`;
+        const errorData = (await response.json()) as { message?: string; error?: string };
+        if ((errorData.message ?? '') !== '' || (errorData.error ?? '') !== '') {
+          errorMessage = `${errorData.message ?? errorData.error} (${response.status})`;
         }
       } catch {
         // Ignore JSON parse errors for error response
@@ -108,10 +104,7 @@ export class ServersGuruClient {
    * Get account balance
    */
   async getBalance(): Promise<number> {
-    const response = await this.request<ApiResponse<{ balance: number }>>(
-      'GET',
-      '/users/balance'
-    );
+    const response = await this.request<ApiResponse<{ balance: number }>>('GET', '/users/balance');
     return response.data?.balance ?? 0;
   }
 
@@ -119,10 +112,7 @@ export class ServersGuruClient {
    * List available VPS products
    */
   async getProducts(): Promise<VpsProduct[]> {
-    const response = await this.request<ApiResponse<VpsProduct[]>>(
-      'GET',
-      '/servers/vps/products'
-    );
+    const response = await this.request<ApiResponse<VpsProduct[]>>('GET', '/servers/vps/products');
     return response.data ?? [];
   }
 
@@ -130,10 +120,7 @@ export class ServersGuruClient {
    * List available OS images
    */
   async getImages(): Promise<string[]> {
-    const response = await this.request<ApiResponse<string[]>>(
-      'GET',
-      '/servers/vps/images'
-    );
+    const response = await this.request<ApiResponse<string[]>>('GET', '/servers/vps/images');
     return response.data ?? [];
   }
 
@@ -148,19 +135,22 @@ export class ServersGuruClient {
     let endpoint = '/servers';
     const params = new URLSearchParams();
 
-    if (options?.search) {params.set('search', options.search);}
-    if (options?.page) {params.set('page', options.page.toString());}
-    if (options?.perPage) {params.set('per_page', options.perPage.toString());}
+    if (options?.search) {
+      params.set('search', options.search);
+    }
+    if (options?.page) {
+      params.set('page', options.page.toString());
+    }
+    if (options?.perPage) {
+      params.set('per_page', options.perPage.toString());
+    }
 
     const queryString = params.toString();
     if (queryString) {
       endpoint += `?${queryString}`;
     }
 
-    const response = await this.request<ApiResponse<ServerInfo[]>>(
-      'GET',
-      endpoint
-    );
+    const response = await this.request<ApiResponse<ServerInfo[]>>('GET', endpoint);
     return response.data ?? [];
   }
 
@@ -168,10 +158,7 @@ export class ServersGuruClient {
    * Get server by ID
    */
   async getServer(id: number): Promise<ServerInfo> {
-    const response = await this.request<ApiResponse<ServerInfo>>(
-      'GET',
-      `/servers/${id}`
-    );
+    const response = await this.request<ApiResponse<ServerInfo>>('GET', `/servers/${id}`);
     if (!response.data) {
       throw new ServersGuruApiError(`Server ${id} not found`, 404);
     }
@@ -182,10 +169,7 @@ export class ServersGuruClient {
    * Get server status
    */
   async getServerStatus(id: number): Promise<ServerStatus> {
-    const response = await this.request<ApiResponse<ServerStatus>>(
-      'GET',
-      `/servers/${id}/status`
-    );
+    const response = await this.request<ApiResponse<ServerStatus>>('GET', `/servers/${id}/status`);
     if (!response.data) {
       throw new ServersGuruApiError(`Unable to get status for server ${id}`);
     }
@@ -210,9 +194,7 @@ export class ServersGuruClient {
     });
 
     if (!response.success || !response.data) {
-      throw new ServersGuruApiError(
-        response.message || response.error || 'Failed to order VPS'
-      );
+      throw new ServersGuruApiError(response.message ?? response.error ?? 'Failed to order VPS');
     }
 
     return {
@@ -287,7 +269,7 @@ export class ServersGuruClient {
     const response = await this.request<ApiResponse<Snapshot>>(
       'POST',
       `/servers/${serverId}/snapshots/create`,
-      { name: name || `snapshot-${Date.now()}` }
+      { name: name ?? `snapshot-${Date.now()}` }
     );
     if (!response.data) {
       throw new ServersGuruApiError('Failed to create snapshot');
@@ -299,10 +281,7 @@ export class ServersGuruClient {
    * Delete snapshot
    */
   async deleteSnapshot(serverId: number, snapshotId: number): Promise<void> {
-    await this.request(
-      'DELETE',
-      `/servers/${serverId}/snapshots/${snapshotId}`
-    );
+    await this.request('DELETE', `/servers/${serverId}/snapshots/${snapshotId}`);
   }
 
   /**
@@ -314,10 +293,7 @@ export class ServersGuruClient {
     targetServerId?: number
   ): Promise<void> {
     const target = targetServerId ?? serverId;
-    await this.request(
-      'POST',
-      `/servers/${serverId}/snapshots/${snapshotId}/restore/${target}`
-    );
+    await this.request('POST', `/servers/${serverId}/snapshots/${snapshotId}/restore/${target}`);
   }
 
   /**
@@ -352,9 +328,7 @@ export class ServersGuruClient {
       }
 
       if (status.status === 'error') {
-        throw new ServersGuruApiError(
-          `Server ${serverId} entered error state`
-        );
+        throw new ServersGuruApiError(`Server ${serverId} entered error state`);
       }
 
       await this.sleep(pollInterval);

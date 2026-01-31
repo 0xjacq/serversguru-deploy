@@ -1,11 +1,9 @@
-import { ServersGuruClient, ServersGuruApiError } from './api/servers-guru.js';
+import { ServersGuruClient } from './api/servers-guru.js';
 import type {
   DeploymentConfig,
   DeploymentResult,
-  ServerInfo,
   DeploymentStep,
   ProgressCallback,
-  Snapshot,
 } from './config.js';
 import { SshProvisioner } from './ssh/provisioner.js';
 import {
@@ -337,12 +335,12 @@ export class DeploymentOrchestrator {
 
     const nginxConfig = this.config.domain
       ? renderTemplate(NGINX_CONFIG_TEMPLATE, {
-        DOMAIN: this.config.domain.name,
-        APP_PORT: this.config.app.port.toString(),
-      })
+          DOMAIN: this.config.domain.name,
+          APP_PORT: this.config.app.port.toString(),
+        })
       : renderTemplate(NGINX_IP_CONFIG_TEMPLATE, {
-        APP_PORT: this.config.app.port.toString(),
-      });
+          APP_PORT: this.config.app.port.toString(),
+        });
 
     const configPath = this.config.domain
       ? `/etc/nginx/sites-available/${this.config.app.name}`
@@ -377,7 +375,7 @@ export class DeploymentOrchestrator {
     try {
       await this.ssh.execOrFail(
         `certbot --nginx -d ${this.config.domain.name} ` +
-        `--non-interactive --agree-tos --email ${this.config.domain.email}`
+          `--non-interactive --agree-tos --email ${this.config.domain.email}`
       );
       this.log('SSL certificate obtained');
     } catch (error) {
@@ -463,7 +461,11 @@ export class DeploymentOrchestrator {
   /**
    * Deploy to an existing server (skip provisioning)
    */
-  async deployToExisting(serverId: number, serverIp: string, password: string): Promise<DeploymentResult> {
+  async deployToExisting(
+    serverId: number,
+    serverIp: string,
+    password: string
+  ): Promise<DeploymentResult> {
     this.serverId = serverId;
     this.serverIp = serverIp;
     this.serverPassword = password;
@@ -502,9 +504,7 @@ export class DeploymentOrchestrator {
         snapshotId: this.snapshotId,
         healthCheckPassed,
         deployedAt: startTime.toISOString(),
-        appUrl: this.config.domain
-          ? `https://${this.config.domain.name}`
-          : `http://${serverIp}`,
+        appUrl: this.config.domain ? `https://${this.config.domain.name}` : `http://${serverIp}`,
         errors: this.errors,
         logs: this.logs,
       };

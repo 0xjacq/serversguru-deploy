@@ -44,10 +44,7 @@ tmp/
 temp/
 *.tmp
 
-# Deployment configs (may contain secrets)
-deploy.yaml
-deploy.yml
-.deploy/
+
 
 # Test artifacts
 test-results/

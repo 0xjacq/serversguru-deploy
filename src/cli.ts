@@ -48,20 +48,22 @@ function applyEnvOverrides(config: Record<string, unknown>): Record<string, unkn
   // Override API key from environment
   if (process.env.SERVERSGURU_API_KEY) {
     config.serversGuru = {
-      ...(config.serversGuru as Record<string, unknown> || {}),
+      ...((config.serversGuru as Record<string, unknown>) || {}),
       apiKey: process.env.SERVERSGURU_API_KEY,
     };
   }
 
   // Override registry auth from environment
-  if (process.env.DOCKER_REGISTRY_USERNAME && process.env.DOCKER_REGISTRY_PASSWORD) {
-    const app = config.app as Record<string, unknown> || {};
+  const registryUser = process.env.DOCKER_REGISTRY_USERNAME;
+  const registryPass = process.env.DOCKER_REGISTRY_PASSWORD;
+  if (registryUser && registryUser !== '' && registryPass && registryPass !== '') {
+    const app = (config.app as Record<string, unknown>) || {};
     config.app = {
       ...app,
       registryAuth: {
-        username: process.env.DOCKER_REGISTRY_USERNAME,
-        password: process.env.DOCKER_REGISTRY_PASSWORD,
-        registry: process.env.DOCKER_REGISTRY || 'ghcr.io',
+        username: registryUser,
+        password: registryPass,
+        registry: process.env.DOCKER_REGISTRY ?? 'ghcr.io',
       },
     };
   }
@@ -111,66 +113,74 @@ program
   .option('--server-ip <ip>', 'Server IP address (required with --server-id)')
   .option('--password <password>', 'Server password (required with --server-id)')
   .option('--dry-run', 'Validate configuration without deploying')
-  .action(async (options) => {
-    try {
-      console.log('Loading configuration...');
-      const config = await loadConfig(options.config);
+  .action(
+    async (options: {
+      config: string;
+      serverId?: string;
+      serverIp?: string;
+      password?: string;
+      dryRun?: boolean;
+    }) => {
+      try {
+        console.log('Loading configuration...');
+        const config = await loadConfig(options.config);
 
-      if (options.dryRun) {
-        console.log('Configuration validated successfully');
-        console.log('\nDeployment summary:');
-        console.log(`  VPS Type: ${config.vps.type}`);
-        console.log(`  OS Image: ${config.vps.osImage}`);
-        console.log(`  App: ${config.app.name}`);
-        console.log(`  Docker Image: ${config.app.dockerImage}`);
-        if (config.domain) {
-          console.log(`  Domain: ${config.domain.name}`);
+        if (options.dryRun === true) {
+          console.log('Configuration validated successfully');
+          console.log('\nDeployment summary:');
+          console.log(`  VPS Type: ${config.vps.type}`);
+          console.log(`  OS Image: ${config.vps.osImage}`);
+          console.log(`  App: ${config.app.name}`);
+          console.log(`  Docker Image: ${config.app.dockerImage}`);
+          if (config.domain) {
+            console.log(`  Domain: ${config.domain.name}`);
+          }
+          return;
         }
-        return;
-      }
 
-      const orchestrator = new DeploymentOrchestrator(config);
-      orchestrator.setProgressCallback(progressCallback);
+        const orchestrator = new DeploymentOrchestrator(config);
+        orchestrator.setProgressCallback(progressCallback);
 
-      let result;
-      if (options.serverId) {
-        if (!options.serverIp || !options.password) {
-          throw new Error('--server-ip and --password are required when using --server-id');
+        let result;
+        if (options.serverId) {
+          if (!options.serverIp || !options.password) {
+            throw new Error('--server-ip and --password are required when using --server-id');
+          }
+          console.log(`Deploying to existing server ${options.serverId}...`);
+          result = await orchestrator.deployToExisting(
+            parseInt(options.serverId, 10),
+            options.serverIp,
+            options.password
+          );
+        } else {
+          console.log('Starting new deployment...\n');
+          result = await orchestrator.deploy();
         }
-        console.log(`Deploying to existing server ${options.serverId}...`);
-        result = await orchestrator.deployToExisting(
-          parseInt(options.serverId, 10),
-          options.serverIp,
-          options.password
-        );
-      } else {
-        console.log('Starting new deployment...\n');
-        result = await orchestrator.deploy();
-      }
 
-      console.log(`\n${'='.repeat(50)}`);
-      if (result.success) {
-        console.log('DEPLOYMENT SUCCESSFUL');
-        console.log('='.repeat(50));
-        console.log(`Server ID: ${result.serverId}`);
-        console.log(`Server IP: ${result.serverIp}`);
-        console.log(`App URL: ${result.appUrl}`);
-        if (result.snapshotId) {
-          console.log(`Snapshot ID: ${result.snapshotId}`);
+        console.log(`\n${'='.repeat(50)}`);
+        if (result.success) {
+          console.log('DEPLOYMENT SUCCESSFUL');
+          console.log('='.repeat(50));
+          console.log(`Server ID: ${result.serverId}`);
+          console.log(`Server IP: ${result.serverIp}`);
+          console.log(`App URL: ${result.appUrl}`);
+          if (result.snapshotId) {
+            console.log(`Snapshot ID: ${result.snapshotId}`);
+          }
+          console.log(`Health Check: ${result.healthCheckPassed ? 'PASSED' : 'FAILED'}`);
+        } else {
+          console.log('DEPLOYMENT FAILED');
+          console.log('='.repeat(50));
+          console.log('\nErrors:');
+          result.errors.forEach((e) => console.log(`  - ${e}`));
+          process.exit(1);
         }
-        console.log(`Health Check: ${result.healthCheckPassed ? 'PASSED' : 'FAILED'}`);
-      } else {
-        console.log('DEPLOYMENT FAILED');
-        console.log('='.repeat(50));
-        console.log('\nErrors:');
-        result.errors.forEach((e) => console.log(`  - ${e}`));
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : error);
         process.exit(1);
       }
-    } catch (error) {
-      console.error('Error:', error instanceof Error ? error.message : error);
-      process.exit(1);
     }
-  });
+  );
 
 // Status command
 program
@@ -178,7 +188,7 @@ program
   .description('Check server status')
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
   .requiredOption('--server-id <id>', 'Server ID to check')
-  .action(async (options) => {
+  .action(async (options: { config: string; serverId: string }) => {
     try {
       const config = await loadConfig(options.config);
       const client = new ServersGuruClient(config.serversGuru);
@@ -206,12 +216,13 @@ program
   .description('List all servers')
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
   .option('--search <query>', 'Search filter')
-  .action(async (options) => {
+  .action(async (options: { config: string; search?: string }) => {
     try {
       const config = await loadConfig(options.config);
       const client = new ServersGuruClient(config.serversGuru);
 
       console.log('Fetching servers...\n');
+      // Fix unsafe assignment
       const servers = await client.listServers({ search: options.search });
 
       if (servers.length === 0) {
@@ -235,7 +246,7 @@ program
   .command('products')
   .description('List available VPS products')
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
-  .action(async (options) => {
+  .action(async (options: { config: string }) => {
     try {
       const config = await loadConfig(options.config);
       const client = new ServersGuruClient(config.serversGuru);
@@ -263,7 +274,7 @@ program
   .command('images')
   .description('List available OS images')
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
-  .action(async (options) => {
+  .action(async (options: { config: string }) => {
     try {
       const config = await loadConfig(options.config);
       const client = new ServersGuruClient(config.serversGuru);
@@ -288,7 +299,7 @@ program
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
   .requiredOption('--server-id <id>', 'Server ID')
   .requiredOption('--snapshot-id <id>', 'Snapshot ID to restore')
-  .action(async (options) => {
+  .action(async (options: { config: string; serverId: string; snapshotId: string }) => {
     try {
       const config = await loadConfig(options.config);
       const client = new ServersGuruClient(config.serversGuru);
@@ -320,7 +331,7 @@ program
   .description('List server snapshots')
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
   .requiredOption('--server-id <id>', 'Server ID')
-  .action(async (options) => {
+  .action(async (options: { config: string; serverId: string }) => {
     try {
       const config = await loadConfig(options.config);
       const client = new ServersGuruClient(config.serversGuru);
@@ -351,7 +362,7 @@ program
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
   .requiredOption('--server-id <id>', 'Server ID')
   .requiredOption('--action <action>', 'Power action: start, shutdown, reboot')
-  .action(async (options) => {
+  .action(async (options: { config: string; serverId: string; action: string }) => {
     try {
       const config = await loadConfig(options.config);
       const client = new ServersGuruClient(config.serversGuru);
@@ -375,7 +386,7 @@ program
   .command('balance')
   .description('Check account balance')
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
-  .action(async (options) => {
+  .action(async (options: { config: string }) => {
     try {
       const config = await loadConfig(options.config);
       const client = new ServersGuruClient(config.serversGuru);
@@ -393,7 +404,7 @@ program
   .command('init')
   .description('Create example configuration file')
   .option('-o, --output <path>', 'Output file path', 'deploy.yaml')
-  .action(async (options) => {
+  .action(async (options: { output: string }) => {
     const exampleConfig = `# Servers.guru Deployment Configuration
 # See: https://my.servers.guru/api
 

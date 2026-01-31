@@ -57,11 +57,11 @@ export class SshProvisioner {
     };
 
     // Handle authentication
-    if (credentials.password) {
+    if (credentials.password && credentials.password !== '') {
       connectConfig.password = credentials.password;
     } else if (credentials.privateKey) {
       connectConfig.privateKey = credentials.privateKey;
-    } else if (this.config.privateKeyPath) {
+    } else if (this.config.privateKeyPath && this.config.privateKeyPath !== '') {
       connectConfig.privateKey = await readFile(this.config.privateKeyPath);
     }
 
@@ -144,8 +144,8 @@ export class SshProvisioner {
     if (result.code !== 0) {
       throw new Error(
         `Command failed with code ${result.code}: ${command.substring(0, 100)}\n` +
-        `stderr: ${result.stderr}\n` +
-        `stdout: ${result.stdout}`
+          `stderr: ${result.stderr}\n` +
+          `stdout: ${result.stdout}`
       );
     }
     return result.stdout;
@@ -227,7 +227,7 @@ export class SshProvisioner {
    */
   async readFile(remotePath: string): Promise<string> {
     const sftp = await this.getSftp();
-    const buffer = await sftp.get(remotePath);
+    const buffer = (await sftp.get(remotePath)) as Buffer;
     return buffer.toString();
   }
 

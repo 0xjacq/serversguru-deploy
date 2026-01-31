@@ -10,7 +10,6 @@ import { access, readFile } from 'fs/promises';
 
 import { ServersGuruClient } from './api/servers-guru.js';
 import type { DeploymentConfig } from './config.js';
-import { DeploymentError, ConfigError, ApiError } from './errors.js';
 import { getLogger } from './logger.js';
 
 /**
@@ -42,7 +41,7 @@ export interface PreflightCheck {
   /** Whether this check is required (deployment will fail if required check fails) */
   required: boolean;
   /** Check function */
-  run: (context: PreflightContext) => Promise<PreflightResult>;
+  run: (context: PreflightContext) => Promise<PreflightResult> | PreflightResult;
 }
 
 /**
@@ -84,16 +83,17 @@ const apiKeyCheck: PreflightCheck = {
   name: 'api-key',
   description: 'Verify API key is configured',
   required: true,
-  async run(context): Promise<PreflightResult> {
+  run(context): PreflightResult {
     const start = Date.now();
     const apiKey = context.config.serversGuru.apiKey;
 
-    if (!apiKey) {
+    if (!apiKey || apiKey === '') {
       return {
         passed: false,
         name: 'api-key',
         message: 'API key is not configured',
-        suggestion: 'Set SERVERSGURU_API_KEY environment variable or add apiKey to your config file',
+        suggestion:
+          'Set SERVERSGURU_API_KEY environment variable or add apiKey to your config file',
         duration: Date.now() - start,
       };
     }
@@ -375,14 +375,15 @@ const dockerImageCheck: PreflightCheck = {
   name: 'docker-image',
   description: 'Verify Docker image format',
   required: true,
-  async run(context): Promise<PreflightResult> {
+  run(context): PreflightResult {
     const start = Date.now();
     const image = context.config.app.dockerImage;
 
     // Basic Docker image name validation
-    const imageRegex = /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)*[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[\w.-]+)?$/i;
+    const imageRegex =
+      /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)*[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[\w.-]+)?$/i;
 
-    if (!image) {
+    if (!image || image === '') {
       return {
         passed: false,
         name: 'docker-image',
@@ -393,9 +394,8 @@ const dockerImageCheck: PreflightCheck = {
     }
 
     // Handle registry URLs
-    const imageWithoutRegistry = image.includes('/') && image.includes('.')
-      ? image.split('/').slice(1).join('/')
-      : image;
+    const imageWithoutRegistry =
+      image.includes('/') && image.includes('.') ? image.split('/').slice(1).join('/') : image;
 
     if (!imageRegex.test(imageWithoutRegistry) && !image.includes('@sha256:')) {
       return {
@@ -423,7 +423,7 @@ const registryAuthCheck: PreflightCheck = {
   name: 'registry-auth',
   description: 'Verify Docker registry authentication',
   required: false,
-  async run(context): Promise<PreflightResult> {
+  run(context): PreflightResult {
     const start = Date.now();
     const auth = context.config.app.registryAuth;
 
@@ -437,8 +437,12 @@ const registryAuthCheck: PreflightCheck = {
     }
 
     const missing: string[] = [];
-    if (!auth.username) {missing.push('username');}
-    if (!auth.password) {missing.push('password');}
+    if (!auth.username || auth.username === '') {
+      missing.push('username');
+    }
+    if (!auth.password || auth.password === '') {
+      missing.push('password');
+    }
 
     if (missing.length > 0) {
       return {
@@ -466,7 +470,7 @@ const dnsCheck: PreflightCheck = {
   name: 'dns-resolution',
   description: 'Verify domain DNS configuration',
   required: false,
-  async run(context): Promise<PreflightResult> {
+  run(context): PreflightResult {
     const start = Date.now();
     const domain = context.config.domain;
 
@@ -481,7 +485,8 @@ const dnsCheck: PreflightCheck = {
 
     // DNS check would require dns.promises module
     // For now, just validate the domain format
-    const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+    const domainRegex =
+      /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
     if (!domainRegex.test(domain.name)) {
       return {
@@ -498,7 +503,7 @@ const dnsCheck: PreflightCheck = {
         passed: false,
         name: 'dns-resolution',
         message: 'Invalid email for SSL certificate',
-        suggestion: 'Provide a valid email address for Let\'s Encrypt',
+        suggestion: "Provide a valid email address for Let's Encrypt",
         duration: Date.now() - start,
       };
     }
@@ -648,8 +653,12 @@ export async function runPreflightChecks(
     }
   }
 
-  const failedRequired = results.filter((r) => !r.passed && checks.find((c) => c.name === r.name)?.required);
-  const failedOptional = results.filter((r) => !r.passed && !checks.find((c) => c.name === r.name)?.required);
+  const failedRequired = results.filter(
+    (r) => !r.passed && checks.find((c) => c.name === r.name)?.required
+  );
+  const failedOptional = results.filter(
+    (r) => !r.passed && !checks.find((c) => c.name === r.name)?.required
+  );
 
   const totalDuration = Date.now() - start;
 
@@ -683,7 +692,9 @@ export function formatPreflightResults(results: PreflightCheckResults): string {
   }
 
   lines.push('='.repeat(50));
-  lines.push(`Passed: ${results.passedCount}, Failed: ${results.failedCount}, Warnings: ${results.warningCount}`);
+  lines.push(
+    `Passed: ${results.passedCount}, Failed: ${results.failedCount}, Warnings: ${results.warningCount}`
+  );
   lines.push(`Total time: ${results.totalDuration}ms`);
 
   if (results.canProceed) {

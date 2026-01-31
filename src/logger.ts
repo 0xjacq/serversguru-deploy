@@ -6,7 +6,6 @@
  */
 
 import { createWriteStream, type WriteStream } from 'fs';
-import { format } from 'util';
 
 /**
  * Log severity levels
@@ -141,7 +140,7 @@ export class Logger {
     this.config = { ...DEFAULT_CONFIG, ...config };
 
     if (this.config.destination === 'file' || this.config.destination === 'both') {
-      if (this.config.filePath) {
+      if (typeof this.config.filePath === 'string' && this.config.filePath.length > 0) {
         this.fileStream = createWriteStream(this.config.filePath, { flags: 'a' });
       }
     }
@@ -224,7 +223,7 @@ export class Logger {
     parts.push(levelStr);
 
     // Deployment ID
-    if (entry.deploymentId) {
+    if (typeof entry.deploymentId === 'string' && entry.deploymentId.length > 0) {
       const deployId = this.config.colors
         ? `${COLORS.cyan}[${entry.deploymentId}]${COLORS.reset}`
         : `[${entry.deploymentId}]`;
@@ -232,7 +231,7 @@ export class Logger {
     }
 
     // Step
-    if (entry.step) {
+    if (typeof entry.step === 'string' && entry.step.length > 0) {
       const step = this.config.colors
         ? `${COLORS.green}[${entry.step}]${COLORS.reset}`
         : `[${entry.step}]`;
@@ -403,17 +402,13 @@ export class Logger {
   /**
    * Create a child logger with additional context
    */
-  child(context: {
-    step?: string;
-    serverId?: number;
-    serverIp?: string;
-  }): Logger {
+  child(context: { step?: string; serverId?: number; serverIp?: string }): Logger {
     const childLogger = new Logger(this.config);
     childLogger.deploymentId = this.deploymentId;
 
     // Create bound methods with context
     const originalLog = this.log.bind(this);
-    childLogger.log = (level: LogLevel, message: string, ctx?: typeof context) => {
+    childLogger.log = (level: LogLevel, message: string, ctx?: typeof context): void => {
       originalLog(level, message, {
         ...context,
         ...ctx,
@@ -442,9 +437,7 @@ let globalLogger: Logger | undefined;
  * Get or create the global logger instance
  */
 export function getLogger(config?: Partial<LoggerConfig>): Logger {
-  if (!globalLogger) {
-    globalLogger = new Logger(config);
-  }
+  globalLogger ??= new Logger(config);
   return globalLogger;
 }
 
