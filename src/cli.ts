@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile, access, constants } from 'fs/promises';
+import { createRequire } from 'module';
 
 import { Command } from 'commander';
 import { parse as parseYaml } from 'yaml';
@@ -7,6 +8,9 @@ import { parse as parseYaml } from 'yaml';
 import { ServersGuruClient } from './api/servers-guru.js';
 import { DeploymentConfigSchema, type DeploymentConfig, type DeploymentStep } from './config.js';
 import { DeploymentOrchestrator } from './orchestrator.js';
+
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json') as { version: string };
 
 const program = new Command();
 
@@ -102,7 +106,7 @@ function progressCallback(step: DeploymentStep, message: string): void {
 program
   .name('sg-deploy')
   .description('Autonomous VPS deployment using Servers.guru API')
-  .version('1.0.0');
+  .version(version);
 
 // Deploy command
 program
