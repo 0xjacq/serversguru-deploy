@@ -50,18 +50,25 @@ async function loadConfig(configPath: string): Promise<DeploymentConfig> {
  */
 function applyEnvOverrides(config: Record<string, unknown>): Record<string, unknown> {
   // Override API key from environment
-  if (process.env.SERVERSGURU_API_KEY) {
+  const apiKey = process.env.SERVERSGURU_API_KEY;
+  if (typeof apiKey === 'string' && apiKey !== '') {
+    const serversGuru = (config.serversGuru as Record<string, unknown>) ?? {};
     config.serversGuru = {
-      ...((config.serversGuru as Record<string, unknown>) || {}),
-      apiKey: process.env.SERVERSGURU_API_KEY,
+      ...serversGuru,
+      apiKey,
     };
   }
 
   // Override registry auth from environment
   const registryUser = process.env.DOCKER_REGISTRY_USERNAME;
   const registryPass = process.env.DOCKER_REGISTRY_PASSWORD;
-  if (registryUser && registryUser !== '' && registryPass && registryPass !== '') {
-    const app = (config.app as Record<string, unknown>) || {};
+  if (
+    typeof registryUser === 'string' &&
+    registryUser !== '' &&
+    typeof registryPass === 'string' &&
+    registryPass !== ''
+  ) {
+    const app = (config.app as Record<string, unknown>) ?? {};
     config.app = {
       ...app,
       registryAuth: {
@@ -146,8 +153,13 @@ program
         orchestrator.setProgressCallback(progressCallback);
 
         let result;
-        if (options.serverId) {
-          if (!options.serverIp || !options.password) {
+        if (typeof options.serverId === 'string' && options.serverId !== '') {
+          if (
+            typeof options.serverIp !== 'string' ||
+            options.serverIp === '' ||
+            typeof options.password !== 'string' ||
+            options.password === ''
+          ) {
             throw new Error('--server-ip and --password are required when using --server-id');
           }
           console.log(`Deploying to existing server ${options.serverId}...`);
@@ -168,10 +180,10 @@ program
           console.log(`Server ID: ${result.serverId}`);
           console.log(`Server IP: ${result.serverIp}`);
           console.log(`App URL: ${result.appUrl}`);
-          if (result.snapshotId) {
+          if (typeof result.snapshotId === 'number' && result.snapshotId > 0) {
             console.log(`Snapshot ID: ${result.snapshotId}`);
           }
-          console.log(`Health Check: ${result.healthCheckPassed ? 'PASSED' : 'FAILED'}`);
+          console.log(`Health Check: ${result.healthCheckPassed === true ? 'PASSED' : 'FAILED'}`);
         } else {
           console.log('DEPLOYMENT FAILED');
           console.log('='.repeat(50));

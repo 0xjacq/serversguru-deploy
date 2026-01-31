@@ -135,13 +135,13 @@ export class ServersGuruClient {
     let endpoint = '/servers';
     const params = new URLSearchParams();
 
-    if (options?.search) {
+    if (typeof options?.search === 'string' && options.search !== '') {
       params.set('search', options.search);
     }
-    if (options?.page) {
+    if (typeof options?.page === 'number' && options.page > 0) {
       params.set('page', options.page.toString());
     }
-    if (options?.perPage) {
+    if (typeof options?.perPage === 'number' && options.perPage > 0) {
       params.set('per_page', options.perPage.toString());
     }
 
