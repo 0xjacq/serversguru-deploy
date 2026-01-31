@@ -25,6 +25,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced CLI with JSON output support
 - Updated package.json with exports field
 
+## [1.1.0] - 2026-01-31
+
+### Fixed
+
+- **getProducts()**: Handle object format `{"FI1-1": {...}}` instead of array
+- **listServers()**: Handle `{"Servers": [...]}` format instead of wrapped data
+- **getServerStatus()**: Handle direct `{"status": "running"}` format
+- **orderVps()**: Handle `{"success": true}` without server details; now polls for new server
+- **powerAction()**: Use correct `powerType` values ("on"/"off"/"reboot")
+
+### Changed
+
+- Major API compatibility fix for Servers.guru actual response formats
+
 ## [1.0.4] - 2026-01-31
 
 ### Fixed

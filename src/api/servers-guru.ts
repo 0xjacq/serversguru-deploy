@@ -47,6 +47,38 @@ interface ApiResponse<T> {
 }
 
 /**
+ * Raw product format from Servers.guru API
+ */
+interface RawProduct {
+  ProductId: number;
+  Cpu: number;
+  Ram: number;
+  Ssd: number;
+  Price: number;
+  Arch: string;
+  CpuModel: string;
+  Bandwidth: number;
+  Location: number;
+}
+
+/**
+ * Raw server format from Servers.guru API
+ */
+interface RawServer {
+  Id: number;
+  Ipv4: string;
+  Ipv6: string;
+  Name: string;
+  VCPU: number;
+  Ram: number;
+  DiskSize: number;
+  CpuModel: string;
+  Dc: string;
+  Disabled: boolean;
+  Created_at: string;
+}
+
+/**
  * Servers.guru API Client
  *
  * Provides typed access to the Servers.guru VPS management API.
@@ -119,8 +151,30 @@ export class ServersGuruClient {
    * List available VPS products
    */
   async getProducts(): Promise<VpsProduct[]> {
-    const response = await this.request<ApiResponse<VpsProduct[]>>('GET', '/servers/vps/products');
-    return response.data ?? [];
+    // API returns object like {"FI1-1": {...}, "FI1-2": {...}}
+    const response = await this.request<Record<string, RawProduct> | ApiResponse<VpsProduct[]>>(
+      'GET',
+      '/servers/vps/products'
+    );
+
+    // Handle object format (actual API)
+    if (typeof response === 'object' && response !== null && !('data' in response)) {
+      const products = response as Record<string, RawProduct>;
+      return Object.entries(products).map(([id, product]) => ({
+        id,
+        name: id,
+        cpu: product.Cpu,
+        ram: product.Ram,
+        disk: product.Ssd,
+        bandwidth: product.Bandwidth,
+        price: { monthly: product.Price, yearly: product.Price * 12 },
+        locations: [String(product.Location)],
+        available: product.ProductId > 0,
+      }));
+    }
+
+    // Handle wrapped format (legacy)
+    return (response as ApiResponse<VpsProduct[]>).data ?? [];
   }
 
   /**
@@ -157,8 +211,29 @@ export class ServersGuruClient {
       endpoint += `?${queryString}`;
     }
 
-    const response = await this.request<ApiResponse<ServerInfo[]>>('GET', endpoint);
-    return response.data ?? [];
+    // API returns {"Servers": [...], "Page": 0, "Total": n}
+    const response = await this.request<{ Servers: RawServer[] } | ApiResponse<ServerInfo[]>>(
+      'GET',
+      endpoint
+    );
+
+    // Handle actual API format
+    if ('Servers' in response && Array.isArray(response.Servers)) {
+      return response.Servers.map((s: RawServer) => ({
+        id: s.Id,
+        name: s.Name || `server-${s.Id}`,
+        ipv4: s.Ipv4,
+        ipv6: s.Ipv6,
+        status: s.Disabled ? 'disabled' : 'active',
+        vpsType: `${s.VCPU}vCPU/${s.Ram}GB`,
+        osImage: '',
+        datacenter: s.Dc,
+        createdAt: s.Created_at,
+      }));
+    }
+
+    // Handle wrapped format (legacy)
+    return (response as ApiResponse<ServerInfo[]>).data ?? [];
   }
 
   /**
@@ -176,23 +251,42 @@ export class ServersGuruClient {
    * Get server status
    */
   async getServerStatus(id: number): Promise<ServerStatus> {
-    const response = await this.request<ApiResponse<ServerStatus>>('GET', `/servers/${id}/status`);
-    if (!response.data) {
-      throw new ServersGuruApiError(`Unable to get status for server ${id}`);
+    // API returns {"status": "running"} directly
+    const response = await this.request<{ status: string } | ApiResponse<ServerStatus>>(
+      'GET',
+      `/servers/${id}/status`
+    );
+
+    // Handle direct format
+    if ('status' in response && typeof response.status === 'string') {
+      return { status: response.status };
     }
-    return response.data;
+
+    // Handle wrapped format
+    if ((response as ApiResponse<ServerStatus>).data) {
+      return (response as ApiResponse<ServerStatus>).data!;
+    }
+
+    throw new ServersGuruApiError(`Unable to get status for server ${id}`);
   }
 
   /**
    * Order a new VPS
+   * Note: The API returns {"success": true} on success, but doesn't return server details.
+   * We need to poll the servers list to get the new server info.
    */
   async orderVps(config: VpsOrderConfig): Promise<OrderResult> {
+    // Get current servers before ordering
+    const serversBefore = await this.listServers();
+    const existingIds = new Set(serversBefore.map((s) => s.id));
+
     const response = await this.request<
-      ApiResponse<{
-        serverId: number;
-        ipv4: string;
-        password: string;
-      }>
+      | { success: boolean; error?: string }
+      | ApiResponse<{
+          serverId: number;
+          ipv4: string;
+          password: string;
+        }>
     >('POST', '/servers/vps/order', {
       vpsType: config.vpsType,
       osImage: config.osImage,
@@ -200,16 +294,44 @@ export class ServersGuruClient {
       hostname: config.hostname,
     });
 
-    if (!response.success || !response.data) {
-      throw new ServersGuruApiError(response.message ?? response.error ?? 'Failed to order VPS');
+    // Handle direct success format (actual API)
+    if ('success' in response && response.success === true) {
+      // Poll for the new server (wait up to 60 seconds)
+      const maxAttempts = 12;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await this.sleep(5000);
+        const serversAfter = await this.listServers();
+        const newServer = serversAfter.find((s) => !existingIds.has(s.id));
+        if (newServer) {
+          return {
+            success: true,
+            serverId: newServer.id,
+            ipv4: newServer.ipv4,
+            password: '', // Password not available via API, check dashboard
+            message: 'VPS ordered successfully. Check dashboard for root password.',
+          };
+        }
+      }
+      throw new ServersGuruApiError('VPS ordered but could not find new server in list');
+    }
+
+    // Handle error
+    if ('error' in response && typeof response.error === 'string' && response.error !== '') {
+      throw new ServersGuruApiError(response.error);
+    }
+
+    // Handle wrapped format (legacy)
+    const wrapped = response as ApiResponse<{ serverId: number; ipv4: string; password: string }>;
+    if (!wrapped.success || !wrapped.data) {
+      throw new ServersGuruApiError(wrapped.message ?? wrapped.error ?? 'Failed to order VPS');
     }
 
     return {
       success: true,
-      serverId: response.data.serverId,
-      ipv4: response.data.ipv4,
-      password: response.data.password,
-      message: response.message,
+      serverId: wrapped.data.serverId,
+      ipv4: wrapped.data.ipv4,
+      password: wrapped.data.password,
+      message: wrapped.message,
     };
   }
 
@@ -217,8 +339,14 @@ export class ServersGuruClient {
    * Perform power action on server
    */
   async powerAction(id: number, action: PowerAction): Promise<void> {
+    // API uses "powerType" with values: "on", "off", "reboot"
+    const powerTypeMap: Record<PowerAction, string> = {
+      start: 'on',
+      shutdown: 'off',
+      reboot: 'reboot',
+    };
     await this.request('POST', `/servers/${id}/power`, {
-      powerType: action,
+      powerType: powerTypeMap[action],
     });
   }
 

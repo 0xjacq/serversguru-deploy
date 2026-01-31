@@ -21,6 +21,22 @@ Deploy your Docker applications to VPS instances with a single command. Handles 
 - 📊 **Structured logging** - JSON or pretty output with sensitive data redaction
 - 🔧 **TypeScript support** - Fully typed API
 
+## Important Notes
+
+### GitHub Actions / CI/CD Compatibility
+
+> ⚠️ **The Servers.guru API may block requests from GitHub Actions IPs.** If you see HTTP 303 redirects to `/login` in your CI/CD pipeline, you'll need to deploy from a local machine instead.
+
+**Workaround options:**
+
+1. Run `npx serversguru-deploy deploy` from your local machine
+2. Use a self-hosted GitHub Actions runner
+3. Contact Servers.guru support about IP whitelisting
+
+### Root Password Access
+
+The API does not return root passwords when ordering VPS. After ordering, check the Servers.guru dashboard for your server credentials.
+
 ## Table of Contents
 
 - [Installation](#installation)
