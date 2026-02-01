@@ -175,10 +175,14 @@ sg-deploy list --search "prod"
 
 #### `products`
 
-List available VPS products.
+List available VPS products with architecture and filtering.
 
 ```bash
-sg-deploy products
+sg-deploy products                    # List all products
+sg-deploy products --arch x86         # Filter by architecture
+sg-deploy products --location NL      # Filter by location
+sg-deploy products --max-price 10     # Filter by max price
+sg-deploy products --json             # JSON output
 ```
 
 #### `images`
@@ -221,6 +225,83 @@ Check account balance.
 
 ```bash
 sg-deploy balance
+```
+
+#### `cancel` / `uncancel`
+
+Cancel or uncancel a server.
+
+```bash
+sg-deploy cancel --server-id 123      # Schedule cancellation at end of term
+sg-deploy uncancel --server-id 123    # Remove cancellation
+```
+
+#### `rename`
+
+Rename a server.
+
+```bash
+sg-deploy rename --server-id 123 --name "my-production-server"
+```
+
+#### `reset-password`
+
+Reset root password for a server.
+
+```bash
+sg-deploy reset-password --server-id 123
+```
+
+#### `protection`
+
+Enable or disable server protection.
+
+```bash
+sg-deploy protection --server-id 123 --action enable
+sg-deploy protection --server-id 123 --action disable
+```
+
+#### `ips`
+
+Manage server IP addresses.
+
+```bash
+sg-deploy ips --server-id 123                 # List IPs
+sg-deploy ips --server-id 123 --order ipv4    # Order new IPv4
+sg-deploy ips --server-id 123 --delete 456    # Delete IP by ID
+```
+
+#### `backups`
+
+Manage server backups.
+
+```bash
+sg-deploy backups --server-id 123             # List backups
+sg-deploy backups --server-id 123 --enable    # Enable auto-backups
+sg-deploy backups --server-id 123 --disable   # Disable auto-backups
+sg-deploy backups --server-id 123 --restore 456  # Restore from backup
+sg-deploy backups --server-id 123 --delete 456   # Delete backup
+```
+
+#### `isos`
+
+Manage server ISO images.
+
+```bash
+sg-deploy isos --server-id 123                # List available ISOs
+sg-deploy isos --server-id 123 --mount 456    # Mount ISO
+sg-deploy isos --server-id 123 --unmount      # Unmount current ISO
+sg-deploy isos --server-id 123 --search ubuntu  # Search ISOs
+```
+
+#### `upgrade`
+
+Upgrade server to a new plan.
+
+```bash
+sg-deploy upgrade --server-id 123 --list                    # List available upgrades
+sg-deploy upgrade --server-id 123 --plan NL1-4 --type nodisk  # Upgrade without disk
+sg-deploy upgrade --server-id 123 --plan NL1-4 --type disk    # Upgrade with disk
 ```
 
 ### Global Options
@@ -324,12 +405,10 @@ const client = new ServersGuruClient({
 const balance = await client.getBalance();
 console.log(`Balance: $${balance}`);
 
-// List products
+// List products with architecture info
 const products = await client.getProducts();
-console.log(
-  'Available VPS types:',
-  products.map((p) => p.id)
-);
+const armProducts = products.filter((p) => p.arch === 'arm64');
+console.log('x86 products:', products.filter((p) => p.arch === 'x86').length);
 
 // Order VPS
 const order = await client.orderVps({
@@ -338,6 +417,24 @@ const order = await client.orderVps({
   billingCycle: 1,
 });
 console.log(`Server ordered: ${order.serverId} at ${order.ipv4}`);
+
+// Server management
+await client.renameServer(123, 'my-prod-server');
+await client.enableProtection(123);
+const { password } = await client.resetPassword(123);
+
+// IP management
+const ips = await client.listIps(123);
+await client.orderIp(123, 'ipv4');
+
+// Backup management
+const backups = await client.listBackups(123);
+await client.enableBackups(123);
+const { upid } = await client.restoreBackup(123, 456);
+
+// ISO management
+const isos = await client.listIsos(123);
+await client.mountIso(123, 456);
 ```
 
 See [API Documentation](docs/API.md) for complete API reference.

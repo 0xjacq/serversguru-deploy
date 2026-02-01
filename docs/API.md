@@ -226,9 +226,120 @@ Stop a running server.
 
 Reboot a server.
 
-##### `rebuildServer(id: number, osImage: string): Promise<{ password: string }>`
+##### `rebuildServer(id: number, image: string): Promise<{ password: string }>`
 
 Rebuild server with new OS.
+
+**Parameters:**
+
+- `id` - Server ID
+- `image` - OS image name (note: parameter is `image`, not `osImage`)
+
+##### `resetPassword(serverId: number): Promise<{ password: string }>`
+
+Reset root password via rescue mode.
+
+**Parameters:**
+
+- `serverId` - Server ID
+
+**Returns:** Object with new password
+
+##### `cancelServer(serverId: number): Promise<void>`
+
+Schedule server cancellation at end of billing term.
+
+##### `uncancelServer(serverId: number): Promise<void>`
+
+Remove scheduled cancellation.
+
+##### `renameServer(serverId: number, name: string): Promise<void>`
+
+Rename a server.
+
+##### `changeBillingCycle(serverId: number, cycle: number): Promise<void>`
+
+Change server billing cycle.
+
+##### `enableProtection(serverId: number): Promise<void>`
+
+Enable server protection (prevents accidental deletion).
+
+##### `disableProtection(serverId: number): Promise<void>`
+
+Disable server protection.
+
+##### `getAvailableUpgrades(serverId: number): Promise<UpgradeOption[]>`
+
+List available upgrade plans for a server.
+
+##### `processUpgrade(serverId: number, plan: string, type: 'disk' | 'nodisk'): Promise<void>`
+
+Upgrade server to a new plan.
+
+**Parameters:**
+
+- `serverId` - Server ID
+- `plan` - New plan ID (e.g., 'NL1-4')
+- `type` - 'disk' to resize disk, 'nodisk' to keep current disk
+
+##### `listIps(serverId: number): Promise<IpInfo[]>`
+
+List all IP addresses for a server.
+
+##### `orderIp(serverId: number, type: 'ipv4' | 'ipv6'): Promise<IpInfo>`
+
+Order a new IP address.
+
+##### `deleteIp(serverId: number, ipId: number): Promise<void>`
+
+Delete an IP address.
+
+##### `updateIpRdns(serverId: number, ipId: number, rdns: string): Promise<void>`
+
+Update reverse DNS for an IP address.
+
+##### `resetIpRdns(serverId: number, ipId: number): Promise<void>`
+
+Reset reverse DNS to default.
+
+##### `listIsos(serverId: number): Promise<Iso[]>`
+
+List available ISO images for a server.
+
+##### `mountIso(serverId: number, isoId: number): Promise<void>`
+
+Mount an ISO image to a server.
+
+##### `unmountIso(serverId: number): Promise<void>`
+
+Unmount the current ISO from a server.
+
+##### `listBackups(serverId: number): Promise<Backup[]>`
+
+List backups for a server.
+
+##### `enableBackups(serverId: number): Promise<void>`
+
+Enable automatic backups for a server.
+
+##### `disableBackups(serverId: number): Promise<void>`
+
+Disable automatic backups for a server.
+
+##### `deleteBackup(serverId: number, backupId: number): Promise<void>`
+
+Delete a backup.
+
+##### `restoreBackup(serverId: number, backupId: number): Promise<{ upid: string }>`
+
+Restore a server from a backup.
+
+**Returns:** Object with `upid` for tracking progress
+
+##### `getBackupStatus(serverId: number, upid: string): Promise<BackupStatus>`
+
+Get the status of a backup or restore operation.
 
 ##### `listSnapshots(serverId: number): Promise<Snapshot[]>`
 
@@ -463,6 +574,13 @@ interface VpsProduct {
   };
   locations: string[];
   available: boolean;
+  arch?: 'x86' | 'arm64'; // CPU architecture
+  cpuModel?: string; // CPU model name
+  dedicated?: boolean; // Dedicated resources
+  backupPrice?: number; // Backup price per month
+  snapshotPrice?: number; // Snapshot price per month
+  speed?: number; // Network speed in Mbps
+  location?: string; // Primary location code
 }
 ```
 
@@ -480,6 +598,15 @@ interface ServerInfo {
   vpsType: string;
   datacenter: string;
   createdAt: string;
+  expireAt?: string; // Expiration date
+  term?: number; // Billing term in months
+  price?: number; // Monthly price
+  rdns?: string; // Reverse DNS
+  cpu?: number; // Number of vCPUs
+  ram?: number; // RAM in MB
+  diskSize?: number; // Disk size in GB
+  cpuModel?: string; // CPU model name
+  disabled?: boolean; // Whether server is disabled
 }
 ```
 
@@ -503,6 +630,48 @@ interface Snapshot {
   size: number;
   createdAt: string;
   status: string;
+  userId?: number; // Owner user ID
+  serverId?: number; // Associated server ID
+  expirationDate?: string; // When snapshot expires
+  active?: boolean; // Whether snapshot is active
+  disabled?: boolean; // Whether snapshot is disabled
+  isProtection?: boolean; // Protection snapshot
+  price?: number; // Snapshot price
+}
+```
+
+### IpInfo
+
+```typescript
+interface IpInfo {
+  id: number;
+  address: string;
+  type: 'ipv4' | 'ipv6';
+  rdns?: string;
+  primary: boolean;
+}
+```
+
+### Backup
+
+```typescript
+interface Backup {
+  id: number;
+  serverId: number;
+  createdAt: string;
+  size: number;
+  status: string;
+}
+```
+
+### Iso
+
+```typescript
+interface Iso {
+  id: number;
+  name: string;
+  size: number;
+  mounted: boolean;
 }
 ```
 

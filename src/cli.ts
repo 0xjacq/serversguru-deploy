@@ -296,28 +296,83 @@ program
   .command('products')
   .description('List available VPS products')
   .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
-  .action(async (options: { config: string }) => {
-    try {
-      const config = await loadConfig(options.config);
-      const client = new ServersGuruClient(config.serversGuru);
+  .option('--arch <arch>', 'Filter by architecture (x86, arm64)')
+  .option('--location <loc>', 'Filter by location code (NL, FI, MTL, etc.)')
+  .option('--max-price <price>', 'Filter by max monthly price')
+  .option('--json', 'Output as JSON')
+  .action(
+    async (options: {
+      config: string;
+      arch?: string;
+      location?: string;
+      maxPrice?: string;
+      json?: boolean;
+    }) => {
+      try {
+        const config = await loadConfig(options.config);
+        const client = new ServersGuruClient(config.serversGuru);
 
-      console.log('Fetching available products...\n');
-      const products = await client.getProducts();
+        console.log('Fetching available products...\n');
+        let products = await client.getProducts();
 
-      console.log('ID\t\tCPU\tRAM\tDisk\tPrice/mo');
-      console.log('-'.repeat(50));
-      for (const product of products) {
-        if (product.available) {
+        // Apply filters
+        products = products.filter((p) => {
+          if (!p.available) {
+            return false;
+          }
+          if (
+            typeof options.arch === 'string' &&
+            options.arch !== '' &&
+            p.arch.toLowerCase() !== options.arch.toLowerCase()
+          ) {
+            return false;
+          }
+          if (
+            typeof options.location === 'string' &&
+            options.location !== '' &&
+            !p.id.toUpperCase().startsWith(options.location.toUpperCase())
+          ) {
+            return false;
+          }
+          if (
+            typeof options.maxPrice === 'string' &&
+            options.maxPrice !== '' &&
+            p.price.monthly > parseFloat(options.maxPrice)
+          ) {
+            return false;
+          }
+          return true;
+        });
+
+        if (products.length === 0) {
+          console.log('No products found matching filters');
+          return;
+        }
+
+        if (options.json === true) {
+          console.log(JSON.stringify(products, null, 2));
+          return;
+        }
+
+        // Sort by price
+        products.sort((a, b) => a.price.monthly - b.price.monthly);
+
+        console.log('ID\t\tArch\tCPU\tRAM\tDisk\tPrice/mo\tCPU Model');
+        console.log('-'.repeat(90));
+        for (const product of products) {
+          const cpuModel =
+            product.cpuModel.length > 25 ? `${product.cpuModel.slice(0, 25)}...` : product.cpuModel;
           console.log(
-            `${product.id}\t\t${product.cpu}\t${product.ram}GB\t${product.disk}GB\t$${product.price.monthly}`
+            `${product.id}\t\t${product.arch}\t${product.cpu}\t${product.ram}GB\t${product.disk}GB\t$${product.price.monthly}\t\t${cpuModel}`
           );
         }
+        console.log(`\nTotal: ${products.length} products`);
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : error);
+        process.exit(1);
       }
-    } catch (error) {
-      console.error('Error:', error instanceof Error ? error.message : error);
-      process.exit(1);
     }
-  });
+  );
 
 // Images command
 program
@@ -509,5 +564,337 @@ options:
     console.log('  3. Run: sg-deploy deploy --dry-run');
     console.log('  4. Run: sg-deploy deploy');
   });
+
+// Cancel command
+program
+  .command('cancel')
+  .description('Cancel server at end of billing term')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID to cancel')
+  .action(async (options: { config: string; serverId: string }) => {
+    try {
+      const config = await loadConfig(options.config);
+      const client = new ServersGuruClient(config.serversGuru);
+
+      console.log(`Scheduling cancellation for server ${options.serverId}...`);
+      await client.cancelServer(parseInt(options.serverId, 10));
+      console.log('Server scheduled for cancellation at end of billing term');
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+// Uncancel command
+program
+  .command('uncancel')
+  .description('Remove cancellation from server')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID to uncancel')
+  .action(async (options: { config: string; serverId: string }) => {
+    try {
+      const config = await loadConfig(options.config);
+      const client = new ServersGuruClient(config.serversGuru);
+
+      console.log(`Removing cancellation from server ${options.serverId}...`);
+      await client.uncancelServer(parseInt(options.serverId, 10));
+      console.log('Cancellation removed');
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+// Rename command
+program
+  .command('rename')
+  .description('Rename a server')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID')
+  .requiredOption('--name <name>', 'New server name')
+  .action(async (options: { config: string; serverId: string; name: string }) => {
+    try {
+      const config = await loadConfig(options.config);
+      const client = new ServersGuruClient(config.serversGuru);
+
+      console.log(`Renaming server ${options.serverId} to "${options.name}"...`);
+      await client.renameServer(parseInt(options.serverId, 10), options.name);
+      console.log('Server renamed successfully');
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+// Reset password command
+program
+  .command('reset-password')
+  .description('Reset root password for a server')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID')
+  .action(async (options: { config: string; serverId: string }) => {
+    try {
+      const config = await loadConfig(options.config);
+      const client = new ServersGuruClient(config.serversGuru);
+
+      console.log(`Resetting password for server ${options.serverId}...`);
+      const result = await client.resetPassword(parseInt(options.serverId, 10));
+      console.log(`New password: ${result.password}`);
+      console.log('\nIMPORTANT: Save this password securely!');
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+// Protection command
+program
+  .command('protection')
+  .description('Enable or disable server protection')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID')
+  .requiredOption('--action <action>', 'Action: enable or disable')
+  .action(async (options: { config: string; serverId: string; action: string }) => {
+    try {
+      const config = await loadConfig(options.config);
+      const client = new ServersGuruClient(config.serversGuru);
+
+      if (options.action === 'enable') {
+        console.log(`Enabling protection for server ${options.serverId}...`);
+        await client.enableProtection(parseInt(options.serverId, 10));
+        console.log('Protection enabled');
+      } else if (options.action === 'disable') {
+        console.log(`Disabling protection for server ${options.serverId}...`);
+        await client.disableProtection(parseInt(options.serverId, 10));
+        console.log('Protection disabled');
+      } else {
+        throw new Error('Invalid action. Use: enable or disable');
+      }
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+// IPs command
+program
+  .command('ips')
+  .description('Manage server IP addresses')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID')
+  .option('--order <type>', 'Order new IP (ipv4 or ipv6)')
+  .option('--delete <ipId>', 'Delete IP by ID')
+  .action(
+    async (options: { config: string; serverId: string; order?: string; delete?: string }) => {
+      try {
+        const config = await loadConfig(options.config);
+        const client = new ServersGuruClient(config.serversGuru);
+        const serverId = parseInt(options.serverId, 10);
+
+        if (options.order) {
+          const ipType = options.order as 'ipv4' | 'ipv6';
+          if (!['ipv4', 'ipv6'].includes(ipType)) {
+            throw new Error('Invalid IP type. Use: ipv4 or ipv6');
+          }
+          console.log(`Ordering ${ipType} for server ${serverId}...`);
+          await client.orderIp(serverId, ipType);
+          console.log('IP ordered successfully');
+        } else if (options.delete) {
+          const ipId = parseInt(options.delete, 10);
+          console.log(`Deleting IP ${ipId} from server ${serverId}...`);
+          await client.deleteIp(serverId, ipId);
+          console.log('IP deleted successfully');
+        } else {
+          // List IPs
+          console.log(`Fetching IPs for server ${serverId}...\n`);
+          const ips = await client.listIps(serverId);
+
+          if (ips.length === 0) {
+            console.log('No IPs found');
+            return;
+          }
+
+          console.log('ID\tType\tAddress\t\t\tRDNS\t\t\tActive');
+          console.log('-'.repeat(80));
+          for (const ip of ips) {
+            console.log(
+              `${ip.id}\t${ip.type}\t${ip.address}\t\t${ip.rdns ?? '-'}\t\t${ip.active ? 'Yes' : 'No'}`
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    }
+  );
+
+// Backups command
+program
+  .command('backups')
+  .description('Manage server backups')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID')
+  .option('--enable', 'Enable automatic backups')
+  .option('--disable', 'Disable automatic backups')
+  .option('--restore <backupId>', 'Restore from backup ID')
+  .option('--delete <backupId>', 'Delete backup by ID')
+  .action(
+    async (options: {
+      config: string;
+      serverId: string;
+      enable?: boolean;
+      disable?: boolean;
+      restore?: string;
+      delete?: string;
+    }) => {
+      try {
+        const config = await loadConfig(options.config);
+        const client = new ServersGuruClient(config.serversGuru);
+        const serverId = parseInt(options.serverId, 10);
+
+        if (options.enable) {
+          console.log(`Enabling backups for server ${serverId}...`);
+          await client.enableBackups(serverId);
+          console.log('Backups enabled');
+        } else if (options.disable) {
+          console.log(`Disabling backups for server ${serverId}...`);
+          await client.disableBackups(serverId);
+          console.log('Backups disabled');
+        } else if (options.restore) {
+          const backupId = parseInt(options.restore, 10);
+          console.log(`Restoring server ${serverId} from backup ${backupId}...`);
+          const result = await client.restoreBackup(serverId, backupId);
+          console.log(`Restore started. Process ID: ${result.upid}`);
+        } else if (options.delete) {
+          const backupId = parseInt(options.delete, 10);
+          console.log(`Deleting backup ${backupId}...`);
+          await client.deleteBackup(serverId, backupId);
+          console.log('Backup deleted');
+        } else {
+          // List backups
+          console.log(`Fetching backups for server ${serverId}...\n`);
+          const backups = await client.listBackups(serverId);
+
+          if (backups.length === 0) {
+            console.log('No backups found');
+            return;
+          }
+
+          console.log('ID\tName\t\t\tCreated\t\t\tSize\tStatus');
+          console.log('-'.repeat(80));
+          for (const backup of backups) {
+            console.log(
+              `${backup.id}\t${backup.name}\t${backup.createdAt}\t${backup.diskSize}GB\t${backup.status}`
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    }
+  );
+
+// ISOs command
+program
+  .command('isos')
+  .description('Manage server ISO images')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID')
+  .option('--mount <isoId>', 'Mount ISO by ID')
+  .option('--unmount', 'Unmount current ISO')
+  .option('--search <query>', 'Search ISOs')
+  .action(
+    async (options: {
+      config: string;
+      serverId: string;
+      mount?: string;
+      unmount?: boolean;
+      search?: string;
+    }) => {
+      try {
+        const config = await loadConfig(options.config);
+        const client = new ServersGuruClient(config.serversGuru);
+        const serverId = parseInt(options.serverId, 10);
+
+        if (options.mount) {
+          const isoId = parseInt(options.mount, 10);
+          console.log(`Mounting ISO ${isoId} to server ${serverId}...`);
+          await client.mountIso(serverId, isoId);
+          console.log('ISO mounted successfully');
+        } else if (options.unmount) {
+          console.log(`Unmounting ISO from server ${serverId}...`);
+          await client.unmountIso(serverId);
+          console.log('ISO unmounted successfully');
+        } else {
+          // List ISOs
+          console.log(`Fetching ISOs for server ${serverId}...\n`);
+          const isos = await client.listIsos(serverId, { search: options.search });
+
+          if (isos.length === 0) {
+            console.log('No ISOs found');
+            return;
+          }
+
+          console.log('ID\tName');
+          console.log('-'.repeat(50));
+          for (const iso of isos) {
+            console.log(`${iso.id}\t${iso.name}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    }
+  );
+
+// Upgrade command
+program
+  .command('upgrade')
+  .description('Upgrade server to a new plan')
+  .option('-c, --config <path>', 'Configuration file path', 'deploy.yaml')
+  .requiredOption('--server-id <id>', 'Server ID')
+  .option('--list', 'List available upgrades')
+  .option('--plan <plan>', 'Target plan identifier')
+  .option('--type <type>', 'Upgrade type: nodisk or disk')
+  .action(
+    async (options: {
+      config: string;
+      serverId: string;
+      list?: boolean;
+      plan?: string;
+      type?: string;
+    }) => {
+      try {
+        const config = await loadConfig(options.config);
+        const client = new ServersGuruClient(config.serversGuru);
+        const serverId = parseInt(options.serverId, 10);
+
+        if (options.list) {
+          console.log(`Fetching available upgrades for server ${serverId}...`);
+          const upgrades = await client.getAvailableUpgrades(serverId);
+          console.log(JSON.stringify(upgrades, null, 2));
+        } else if (options.plan && options.type) {
+          const upgradeType = options.type as 'nodisk' | 'disk';
+          if (!['nodisk', 'disk'].includes(upgradeType)) {
+            throw new Error('Invalid upgrade type. Use: nodisk or disk');
+          }
+          console.log(`Upgrading server ${serverId} to plan ${options.plan}...`);
+          await client.processUpgrade(serverId, options.plan, upgradeType);
+          console.log('Upgrade initiated successfully');
+        } else {
+          console.log('Usage: sg-deploy upgrade --server-id <id> --list');
+          console.log(
+            '       sg-deploy upgrade --server-id <id> --plan <plan> --type <nodisk|disk>'
+          );
+        }
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    }
+  );
 
 program.parse();

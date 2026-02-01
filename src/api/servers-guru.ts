@@ -5,6 +5,9 @@ import type {
   VpsProduct,
   Snapshot,
   OrderResult,
+  IpInfo,
+  Backup,
+  Iso,
 } from '../config.js';
 
 /**
@@ -59,6 +62,10 @@ interface RawProduct {
   CpuModel: string;
   Bandwidth: number;
   Location: number;
+  Dedicated: boolean;
+  Backup: number;
+  Snapshot: number;
+  Speed: number;
 }
 
 /**
@@ -76,6 +83,27 @@ interface RawServer {
   Dc: string;
   Disabled: boolean;
   Created_at: string;
+  Expire_at?: string;
+  Term?: number;
+  Price?: number;
+  Rdns?: string;
+}
+
+/**
+ * Raw snapshot format from Servers.guru API
+ */
+interface RawSnapshot {
+  id: number;
+  name: string;
+  created: string;
+  id_user: number;
+  id_server: number;
+  expiration_date: string;
+  active: boolean;
+  disabled: boolean;
+  status: string;
+  is_protection: boolean;
+  price: number;
 }
 
 /**
@@ -170,6 +198,13 @@ export class ServersGuruClient {
         price: { monthly: product.Price, yearly: product.Price * 12 },
         locations: [String(product.Location)],
         available: product.ProductId > 0,
+        arch: product.Arch,
+        cpuModel: product.CpuModel,
+        dedicated: product.Dedicated ?? false,
+        backupPrice: product.Backup ?? 0,
+        snapshotPrice: product.Snapshot ?? 0,
+        speed: product.Speed ?? 1,
+        location: product.Location,
       }));
     }
 
@@ -237,6 +272,15 @@ export class ServersGuruClient {
         osImage: '',
         datacenter: s.Dc,
         createdAt: s.Created_at,
+        expireAt: s.Expire_at,
+        term: s.Term,
+        price: s.Price,
+        rdns: s.Rdns,
+        cpu: s.VCPU,
+        ram: s.Ram,
+        diskSize: s.DiskSize,
+        cpuModel: s.CpuModel,
+        disabled: s.Disabled,
       }));
     }
 
@@ -392,7 +436,7 @@ export class ServersGuruClient {
     const response = await this.request<{ password: string } | ApiResponse<{ password: string }>>(
       'POST',
       `/servers/${id}/rebuild`,
-      { osImage }
+      { image: osImage }
     );
     // Handle direct format (actual API)
     if ('password' in response && typeof response.password === 'string') {
@@ -410,13 +454,26 @@ export class ServersGuruClient {
    * List server snapshots
    */
   async listSnapshots(serverId: number): Promise<Snapshot[]> {
-    const response = await this.request<Snapshot[] | ApiResponse<Snapshot[]>>(
+    const response = await this.request<RawSnapshot[] | ApiResponse<Snapshot[]>>(
       'GET',
       `/servers/${serverId}/snapshots`
     );
     // Handle direct array format (actual API)
     if (Array.isArray(response)) {
-      return response;
+      return response.map((s: RawSnapshot) => ({
+        id: s.id,
+        name: s.name,
+        size: 0, // Not provided by API
+        createdAt: s.created,
+        status: s.status,
+        userId: s.id_user,
+        serverId: s.id_server,
+        expirationDate: s.expiration_date,
+        active: s.active,
+        disabled: s.disabled,
+        isProtection: s.is_protection,
+        price: s.price,
+      }));
     }
     // Handle wrapped format (legacy)
     return response.data ?? [];
@@ -490,8 +547,250 @@ export class ServersGuruClient {
   /**
    * Set reverse DNS
    */
-  async setReverseDns(serverId: number, hostname: string): Promise<void> {
-    await this.request('POST', `/servers/${serverId}/rdns`, { hostname });
+  async setReverseDns(serverId: number, rdns: string): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/rdns/edit`, { rdns });
+  }
+
+  /**
+   * Reset root password (rescue mode)
+   * @returns The new root password
+   */
+  async resetPassword(serverId: number): Promise<{ password: string }> {
+    const response = await this.request<{ password: string }>(
+      'POST',
+      `/servers/${serverId}/rescue/password`
+    );
+    return response;
+  }
+
+  /**
+   * Cancel server at end of billing term
+   */
+  async cancelServer(serverId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/cancel`);
+  }
+
+  /**
+   * Remove cancellation from server
+   */
+  async uncancelServer(serverId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/uncancel`);
+  }
+
+  /**
+   * Rename server
+   */
+  async renameServer(serverId: number, name: string): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/editname`, { name });
+  }
+
+  /**
+   * Change billing cycle
+   * @param billingCycle Number of months (1-12)
+   */
+  async changeBillingCycle(serverId: number, billingCycle: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/term`, { billingCycle });
+  }
+
+  /**
+   * Enable server protection
+   */
+  async enableProtection(serverId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/protection/enable`);
+  }
+
+  /**
+   * Disable server protection
+   */
+  async disableProtection(serverId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/protection/disable`);
+  }
+
+  /**
+   * Get available upgrades for a server
+   */
+  async getAvailableUpgrades(serverId: number): Promise<unknown> {
+    return this.request('GET', `/servers/${serverId}/upgrade`);
+  }
+
+  /**
+   * Process server upgrade
+   * @param plan Target plan identifier
+   * @param upgradeType "nodisk" or "disk" (if disk must be upgraded too)
+   */
+  async processUpgrade(
+    serverId: number,
+    plan: string,
+    upgradeType: 'nodisk' | 'disk'
+  ): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/upgrade`, {
+      plan,
+      upgrade: upgradeType,
+    });
+  }
+
+  // ==================== Network/IP Methods ====================
+
+  /**
+   * List IP addresses for a server
+   */
+  async listIps(serverId: number): Promise<IpInfo[]> {
+    interface RawIp {
+      id: number;
+      address: string;
+      type: 'ipv4' | 'ipv6';
+      rdns?: string;
+      price: number;
+      active: number;
+      blocked: number;
+      created: string;
+      expiration_date?: string;
+    }
+    const response = await this.request<RawIp[]>('GET', `/servers/${serverId}/ips`);
+    return response.map((ip) => ({
+      id: ip.id,
+      address: ip.address,
+      type: ip.type,
+      rdns: ip.rdns,
+      price: ip.price,
+      active: ip.active === 1,
+      blocked: ip.blocked === 1,
+      createdAt: ip.created,
+      expirationDate: ip.expiration_date,
+    }));
+  }
+
+  /**
+   * Order additional IP address
+   * @param ipType 'ipv4' or 'ipv6'
+   */
+  async orderIp(serverId: number, ipType: 'ipv4' | 'ipv6'): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/ips/order`, { ipType });
+  }
+
+  /**
+   * Update reverse DNS for a specific IP
+   */
+  async updateIpRdns(serverId: number, ipId: number, rdns: string): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/ips/rdns/edit`, { ipId, rdns });
+  }
+
+  /**
+   * Delete an additional IP address
+   */
+  async deleteIp(serverId: number, ipId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/ips/${ipId}/delete`);
+  }
+
+  /**
+   * Reset reverse DNS for an IP to default
+   */
+  async resetIpRdns(serverId: number, ipId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/ips/${ipId}/rdns/reset`);
+  }
+
+  // ==================== ISO Methods ====================
+
+  /**
+   * List available ISOs for a server
+   */
+  async listIsos(serverId: number, options?: { page?: number; search?: string }): Promise<Iso[]> {
+    let endpoint = `/servers/${serverId}/isos`;
+    if (options?.search) {
+      endpoint += `/search/${encodeURIComponent(options.search)}`;
+    }
+    if (options?.page !== undefined) {
+      endpoint += `/page/${options.page}`;
+    }
+    return this.request<Iso[]>('GET', endpoint);
+  }
+
+  /**
+   * Mount an ISO to a server
+   */
+  async mountIso(serverId: number, isoId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/isos/mount/${isoId}`);
+  }
+
+  /**
+   * Unmount current ISO from server
+   */
+  async unmountIso(serverId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/isos/unmount`);
+  }
+
+  // ==================== Backup Methods ====================
+
+  /**
+   * List backups for a server
+   */
+  async listBackups(serverId: number): Promise<Backup[]> {
+    interface RawBackup {
+      name: string;
+      description?: string;
+      created: string;
+      disk_size: number;
+      image_size: number;
+      status: string;
+      id_server: number;
+      hetzner_id: number;
+    }
+    const response = await this.request<RawBackup[]>('GET', `/servers/${serverId}/backups`);
+    return response.map((b) => ({
+      id: b.hetzner_id,
+      name: b.name,
+      description: b.description,
+      createdAt: b.created,
+      diskSize: b.disk_size,
+      imageSize: b.image_size,
+      status: b.status,
+      serverId: b.id_server,
+    }));
+  }
+
+  /**
+   * Enable automatic backups for a server
+   */
+  async enableBackups(serverId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/backups/enable`);
+  }
+
+  /**
+   * Disable automatic backups for a server
+   */
+  async disableBackups(serverId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/backups/disable`);
+  }
+
+  /**
+   * Delete a backup
+   */
+  async deleteBackup(serverId: number, backupId: number): Promise<void> {
+    await this.request('POST', `/servers/${serverId}/backups/${backupId}/delete`);
+  }
+
+  /**
+   * Restore a backup to the server
+   * @returns The process ID (upid) for tracking restoration status
+   */
+  async restoreBackup(serverId: number, backupId: number): Promise<{ upid: number }> {
+    return this.request<{ upid: number }>(
+      'POST',
+      `/servers/${serverId}/backups/${backupId}/restore`
+    );
+  }
+
+  /**
+   * Get backup/restore task status
+   */
+  async getBackupStatus(
+    serverId: number,
+    upid: string
+  ): Promise<{ completed: boolean; percent: number }> {
+    return this.request<{ completed: boolean; percent: number }>(
+      'GET',
+      `/servers/${serverId}/backups/${upid}/status`
+    );
   }
 
   /**

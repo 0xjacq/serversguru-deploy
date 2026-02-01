@@ -113,6 +113,24 @@ export interface ServerInfo {
   vpsType: string;
   datacenter: string;
   createdAt: string;
+  /** Expiration date */
+  expireAt?: string;
+  /** Billing term in months */
+  term?: number;
+  /** Monthly price */
+  price?: number;
+  /** Reverse DNS hostname */
+  rdns?: string;
+  /** CPU count */
+  cpu?: number;
+  /** RAM in GB */
+  ram?: number;
+  /** Disk size in GB */
+  diskSize?: number;
+  /** CPU model */
+  cpuModel?: string;
+  /** Whether server is disabled */
+  disabled?: boolean;
 }
 
 /**
@@ -141,6 +159,20 @@ export interface VpsProduct {
   };
   locations: string[];
   available: boolean;
+  /** CPU architecture (x86, arm64, etc.) */
+  arch: string;
+  /** CPU model name */
+  cpuModel: string;
+  /** Whether this is a dedicated server */
+  dedicated: boolean;
+  /** Monthly backup price */
+  backupPrice: number;
+  /** Monthly snapshot price */
+  snapshotPrice: number;
+  /** Network speed in Gbps */
+  speed: number;
+  /** Location/datacenter ID */
+  location: number;
 }
 
 /**
@@ -152,6 +184,59 @@ export interface Snapshot {
   size: number;
   createdAt: string;
   status: string;
+  /** User ID who owns this snapshot */
+  userId?: number;
+  /** Server ID this snapshot belongs to */
+  serverId?: number;
+  /** Expiration date */
+  expirationDate?: string;
+  /** Whether snapshot is active */
+  active?: boolean;
+  /** Whether snapshot is disabled */
+  disabled?: boolean;
+  /** Whether this is a protection snapshot */
+  isProtection?: boolean;
+  /** Monthly price for this snapshot */
+  price?: number;
+}
+
+/**
+ * IP address information
+ */
+export interface IpInfo {
+  id: number;
+  address: string;
+  type: 'ipv4' | 'ipv6';
+  rdns?: string;
+  price: number;
+  active: boolean;
+  blocked: boolean;
+  createdAt: string;
+  expirationDate?: string;
+}
+
+/**
+ * Backup information
+ */
+export interface Backup {
+  id: number;
+  name: string;
+  description?: string;
+  createdAt: string;
+  diskSize: number;
+  imageSize: number;
+  status: string;
+  serverId: number;
+}
+
+/**
+ * ISO image information
+ */
+export interface Iso {
+  id: number;
+  name: string;
+  description?: string;
+  size?: number;
 }
 
 /**
